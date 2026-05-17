@@ -132,7 +132,7 @@
 
         <!-- ===== 탭1: 오늘 현황 ===== -->
         <div class="tab-content active" id="content-today">
-            <div class="stats-row">
+            <div class="stats-row stats-row-4">
                 <div class="stat-card">
                     <span class="stat-number" id="stat-homework">0</span>
                     <span class="stat-label">📚 숙제 완료</span>
@@ -145,6 +145,10 @@
                     <span class="stat-number" id="stat-presentation">0</span>
                     <span class="stat-label">🎤 총 발표</span>
                 </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="stat-praise">0</span>
+                    <span class="stat-label">💌 칭찬쪽지</span>
+                </div>
             </div>
 
             <div class="table-wrapper">
@@ -156,6 +160,7 @@
                             <th>📚 숙제</th>
                             <th>🧹 1인1역</th>
                             <th>🎤 발표</th>
+                            <th>💌 칭찬쪽지</th>
                         </tr>
                     </thead>
                     <tbody id="today-table-body">
@@ -191,6 +196,7 @@
                             <th>📚 숙제</th>
                             <th>🧹 1인1역</th>
                             <th>🎤 발표보너스</th>
+                            <th>💌 칭찬쪽지</th>
                             <th>⭐ 총점</th>
                         </tr>
                     </thead>
@@ -249,7 +255,7 @@
             <!-- 조회 결과 요약 -->
             <div class="history-summary hidden" id="history-summary">
                 <div class="history-period" id="history-period-text"></div>
-                <div class="stats-row">
+                <div class="stats-row stats-row-4">
                     <div class="stat-card">
                         <span class="stat-number" id="hist-stat-homework">0</span>
                         <span class="stat-label">📚 숙제 완료</span>
@@ -261,6 +267,10 @@
                     <div class="stat-card">
                         <span class="stat-number" id="hist-stat-presentation">0</span>
                         <span class="stat-label">🎤 총 발표</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="hist-stat-praise">0</span>
+                        <span class="stat-label">💌 칭찬쪽지</span>
                     </div>
                 </div>
             </div>
@@ -275,6 +285,7 @@
                             <th>📚 숙제</th>
                             <th>🧹 1인1역</th>
                             <th>🎤 발표보너스</th>
+                            <th>💌 칭찬쪽지</th>
                             <th>⭐ 총점</th>
                         </tr>
                     </thead>
