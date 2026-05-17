@@ -48,10 +48,10 @@ var el={};
  'presentation-count','presentation-minus','presentation-plus','today-points','bonus-hint','admin-btn','back-btn-student','back-btn-admin',
  'password-modal','admin-password','password-error','modal-cancel','modal-confirm',
  'tab-today','tab-points','tab-history','content-today','content-points','content-history',
- 'today-table-body','points-table-body','stat-homework','stat-duty','stat-presentation',
+ 'today-table-body','points-table-body','stat-homework','stat-duty','stat-presentation','stat-praise',
  'loading-overlay','reset-points-btn','reset-modal','reset-cancel','reset-confirm',
  'reset-date-display','search-history-btn','history-summary','history-period-text',
- 'hist-stat-homework','hist-stat-duty','hist-stat-presentation',
+ 'hist-stat-homework','hist-stat-duty','hist-stat-presentation','hist-stat-praise',
  'history-table-wrapper','history-table-body','history-empty',
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint'
 ].forEach(function(id){
@@ -176,8 +176,9 @@ function updateStudentUI(){
     el.bonusHint.textContent='다음 보너스까지 '+remaining+'회';
     el.bonusHint.className='bonus-hint'+(remaining===1?' close':'');
   }
-  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;
-  el.todayPoints.textContent=pts+'점'+(bonus>0?' (발표보너스 '+bonus+'점 포함)':'');
+  var praise=currentData.praise||0;
+  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;
+  el.todayPoints.textContent=pts+'점'+(bonus>0||praise>0?' ('+(bonus>0?'발표보너스 '+bonus+'점':'')+(bonus>0&&praise>0?' + ':'')+( praise>0?'칭찬쪽지 '+praise+'점':'')+' 포함)':'');
 }
 
 function saveStudentData(){
@@ -185,7 +186,8 @@ function saveStudentData(){
   db.collection('checklist').doc(getDocId(currentStudent.name)).set({
     name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),
     homework:currentData.homework||false,duty:currentData.duty||false,
-    presentations:currentData.presentations||0
+    presentations:currentData.presentations||0,
+    praise:currentData.praise||0
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
 
@@ -270,17 +272,17 @@ function loadLastReset(){
 
 // ===== Today Status =====
 function loadTodayStatus(){
-  var today=getTodayString(),tHw=0,tDu=0,tPr=0,rows=[];
+  var today=getTodayString(),tHw=0,tDu=0,tPr=0,tPraise=0,rows=[];
   var promises=STUDENTS.map(function(s){
     return db.collection('checklist').doc(s.name+'_'+today).get().then(function(snap){
-      var d=snap.exists?snap.data():{homework:false,duty:false,presentations:0};
-      if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);
-      rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0});
+      var d=snap.exists?snap.data():{homework:false,duty:false,presentations:0,praise:0};
+      if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);
+      rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0});
     });
   });
   return Promise.all(promises).then(function(){
     rows.sort(function(a,b){return a.id-b.id;});
-    el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;
+    el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
     el.todayTableBody.innerHTML=rows.map(function(r){
       return '<tr><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
         '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
@@ -289,6 +291,11 @@ function loadTodayStatus(){
           '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
           '<span class="admin-pres-val">'+r.presentations+'</span>'+
           '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
+        '</div></td>'+
+        '<td><div class="admin-pres-ctrl">'+
+          '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
+          '<span class="admin-praise-val">'+r.praise+'</span>'+
+          '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
         '</div></td></tr>';
     }).join('');
   });
@@ -298,7 +305,7 @@ function loadTodayStatus(){
 function loadCumulativePoints(){
   return db.collection('checklist').get().then(function(snap){
     var map={};
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0};});
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0};});
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name])return;
@@ -307,6 +314,7 @@ function loadCumulativePoints(){
       if(d.homework)map[d.name].hw++;
       if(d.duty)map[d.name].du++;
       map[d.name].pr+=(d.presentations||0);
+      map[d.name].praise+=(d.praise||0);
     });
     renderPointsTable(map,el.pointsTableBody);
   });
@@ -317,7 +325,7 @@ function renderPointsTable(map,tbody){
   var arr=[];
   Object.keys(map).forEach(function(name){
     var s=map[name]; var bonus=Math.floor(s.pr/3);
-    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,total:s.hw+s.du+bonus});
+    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,total:s.hw+s.du+bonus+s.praise});
   });
   arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
   tbody.innerHTML=arr.map(function(r,i){
@@ -327,6 +335,7 @@ function renderPointsTable(map,tbody){
     return '<tr><td>'+badge+'</td><td><strong>'+r.name+'</strong></td>'+
       '<td>'+r.hw+'점</td><td>'+r.du+'점</td>'+
       '<td>'+r.bonus+'점 <small style="color:#999">('+r.pr+'회)</small></td>'+
+      '<td>'+r.praise+'점</td>'+
       '<td><span class="total-points">'+r.total+'</span></td></tr>';
   }).join('');
 }
@@ -362,6 +371,23 @@ el.todayTableBody.addEventListener('click',function(e){
   db.collection('checklist').doc(name+'_'+today).set({presentations:newVal},{merge:true})
   .then(function(){return loadTodayStatus();})
   .then(function(){showToast('✏️ '+name+' 발표 '+newVal+'회로 수정했어요');})
+  .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
+});
+
+// ===== Admin: Direct Praise Edit =====
+el.todayTableBody.addEventListener('click',function(e){
+  var btn=e.target.closest('.admin-praise-btn');
+  if(!btn)return;
+  var name=btn.dataset.name;
+  var delta=parseInt(btn.dataset.delta);
+  var valSpan=btn.parentElement.querySelector('.admin-praise-val');
+  var cur=parseInt(valSpan.textContent)||0;
+  var newVal=cur+delta;
+  if(newVal<0){showToast('💌 0점 이하로 줄일 수 없어요');return;}
+  var today=getTodayString();
+  db.collection('checklist').doc(name+'_'+today).set({praise:newVal},{merge:true})
+  .then(function(){return loadTodayStatus();})
+  .then(function(){showToast('💌 '+name+' 칭찬쪽지 '+newVal+'점으로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
 
@@ -414,8 +440,8 @@ function getDateRange(){
 
 function loadHistoryData(startDate,endDate,label){
   return db.collection('checklist').get().then(function(snap){
-    var map={};var tHw=0,tDu=0,tPr=0;
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0};});
+    var map={};var tHw=0,tDu=0,tPr=0,tPraise=0;
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0};});
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name]||!d.date)return;
@@ -423,11 +449,12 @@ function loadHistoryData(startDate,endDate,label){
         if(d.homework){map[d.name].hw++;tHw++;}
         if(d.duty){map[d.name].du++;tDu++;}
         var p=d.presentations||0;map[d.name].pr+=p;tPr+=p;
+        var pr=d.praise||0;map[d.name].praise+=pr;tPraise+=pr;
       }
     });
     // Show results
     el.historyPeriodText.textContent='📅 '+label;
-    el.histStatHomework.textContent=tHw;el.histStatDuty.textContent=tDu;el.histStatPresentation.textContent=tPr;
+    el.histStatHomework.textContent=tHw;el.histStatDuty.textContent=tDu;el.histStatPresentation.textContent=tPr;el.histStatPraise.textContent=tPraise;
     el.historySummary.classList.remove('hidden');
     el.historyTableWrapper.style.display='block';
     el.historyEmpty.style.display='none';
