@@ -89,6 +89,10 @@ body::after {
   animation: fadeIn 0.4s ease;
 }
 
+#admin-page {
+  max-width: 1000px;
+}
+
 .page.active {
   display: block;
 }
@@ -615,6 +619,7 @@ body::after {
   text-align: center;
   border-bottom: 1px solid #F5F5F5;
   color: var(--text-medium);
+  white-space: nowrap;
 }
 
 .admin-table tbody tr {
@@ -1196,11 +1201,12 @@ body::after {
 .custom-student-card {
   background: var(--white);
   border-radius: var(--radius-md);
-  padding: 14px 10px;
+  padding: 16px 10px;
   text-align: center;
   box-shadow: var(--shadow-soft);
   border: 2px solid transparent;
   transition: var(--transition);
+  cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1209,41 +1215,43 @@ body::after {
 .custom-student-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
+  border-color: var(--sunflower-yellow);
 }
 .custom-student-card .name {
   font-family: 'Jua', sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   color: var(--text-dark);
 }
-.custom-ctrl {
+
+.custom-modal-content {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 20px;
 }
-.custom-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  border: none;
-  font-size: 1.2rem;
-  font-weight: 700;
-  cursor: pointer;
+.custom-modal-input-group {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--white);
+  flex-direction: column;
+  text-align: left;
+}
+.custom-modal-input-group label {
+  font-size: 0.9rem;
+  color: var(--text-medium);
+  margin-bottom: 4px;
+}
+.custom-modal-input-group input {
+  padding: 10px 12px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 1rem;
+  outline: none;
   transition: var(--transition);
 }
-.custom-btn.plus {
-  background: linear-gradient(135deg, #4CAF50, #388E3C);
-  box-shadow: 0 3px 8px rgba(76, 175, 80, 0.3);
+.custom-modal-input-group input:focus {
+  border-color: var(--sunflower-yellow);
 }
-.custom-btn.plus:hover { transform: scale(1.1); box-shadow: 0 5px 12px rgba(76, 175, 80, 0.4); }
-.custom-btn.minus {
-  background: linear-gradient(135deg, #EF5350, #E53935);
-  box-shadow: 0 3px 8px rgba(239, 83, 80, 0.3);
-}
-.custom-btn.minus:hover { transform: scale(1.1); box-shadow: 0 5px 12px rgba(239, 83, 80, 0.4); }
-.custom-btn:active { transform: scale(0.95); }
 
 .custom-logs-box {
   background: var(--white);
@@ -1278,9 +1286,25 @@ body::after {
 }
 .custom-logs-list li .log-point {
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .custom-logs-list li .log-point.pos { color: #388E3C; }
 .custom-logs-list li .log-point.neg { color: #D32F2F; }
+
+.delete-log-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: 2px;
+}
+.delete-log-btn:hover {
+  opacity: 1;
+}
 
 @media (max-width: 480px) {
   .stats-row-6 {

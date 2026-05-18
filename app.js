@@ -54,7 +54,9 @@ var el={};
  'hist-stat-homework','hist-stat-duty','hist-stat-presentation','hist-stat-praise','hist-stat-attitude','hist-stat-custom',
  'history-table-wrapper','history-table-body','history-empty',
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
- 'custom-reason','custom-student-grid','custom-logs-list'
+ 'custom-student-grid','custom-logs-list',
+ 'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
+ 'reset-date-input'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
   el[camel]=document.getElementById(id);
@@ -66,6 +68,7 @@ var unsubscribeSnapshot=null, homeUnsubscribes=[];
 var adminUnsubscribes={today:null, points:null, custom:null};
 var lastResetDate=null; // date string of last reset, null=no reset
 var currentPeriod='daily';
+var targetCustomStudent=null; // 모달용 타겟 학생 이름
 
 // ===== Navigation =====
 function showPage(name){
@@ -373,19 +376,24 @@ function renderPointsTable(map,tbody){
 }
 
 // ===== Reset Points =====
-el.resetPointsBtn.addEventListener('click',function(){el.resetModal.classList.add('active');});
+el.resetPointsBtn.addEventListener('click',function(){
+  el.resetDateInput.value=getTodayString();
+  el.resetModal.classList.add('active');
+});
 el.resetCancel.addEventListener('click',function(){el.resetModal.classList.remove('active');});
 el.resetModal.addEventListener('click',function(e){if(e.target===el.resetModal)el.resetModal.classList.remove('active');});
 el.resetConfirm.addEventListener('click',function(){
+  var selectedDate=el.resetDateInput.value;
+  if(!selectedDate){ showToast('📅 날짜를 선택해주세요'); return; }
+  
   el.resetModal.classList.remove('active');showLoading(true);
-  var today=getTodayString();
-  db.collection('resets').add({date:today,timestamp:firebase.firestore.FieldValue.serverTimestamp()})
+  db.collection('resets').add({date:selectedDate,timestamp:firebase.firestore.FieldValue.serverTimestamp()})
   .then(function(){
-    lastResetDate=today;
-    el.resetDateDisplay.textContent=formatDateKR(today)+' 이후';
+    lastResetDate=selectedDate;
+    el.resetDateDisplay.textContent=formatDateKR(selectedDate)+' 이후';
     return loadCumulativePoints();
   }).then(function(){
-    showLoading(false);showToast('✅ 포인트가 초기화되었습니다');
+    showLoading(false);showToast('✅ 포인트 누적 기준일이 변경되었습니다');
   }).catch(function(e){console.error(e);showLoading(false);showToast('❌ 초기화 오류');});
 });
 
@@ -514,13 +522,9 @@ function loadHistoryData(startDate,endDate,label){
 function loadCustomTab(){
   return new Promise(function(resolve, reject){
     // 1. Render student grid (only once)
-    if(el.customStudentGrid.innerHTML.trim() === '') {
+    if(el.customStudentGrid.children.length === 0) {
       el.customStudentGrid.innerHTML=STUDENTS.map(function(s){
-        return '<div class="custom-student-card"><div class="name">'+s.id+'. '+s.name+'</div>'+
-          '<div class="custom-ctrl">'+
-            '<button class="custom-btn minus" data-name="'+s.name+'" data-delta="-1">−</button>'+
-            '<button class="custom-btn plus" data-name="'+s.name+'" data-delta="1">+</button>'+
-          '</div></div>';
+        return '<div class="custom-student-card" data-name="'+s.name+'"><div class="name">'+s.id+'. '+s.name+'</div></div>';
       }).join('');
     }
     
@@ -546,7 +550,7 @@ function loadCustomTab(){
           var timeStr=new Date(l.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
           var sign=l.point>0?'+':'';
           var cname=l.point>0?'pos':'neg';
-          return '<li><span><strong>'+l.name+'</strong> - '+l.reason+' <small>('+timeStr+')</small></span><span class="log-point '+cname+'">'+sign+l.point+'점</span></li>';
+          return '<li><span><strong>'+l.name+'</strong> - '+l.reason+' <small>('+timeStr+')</small></span><span class="log-point '+cname+'">'+sign+l.point+'점 <button class="delete-log-btn" data-name="'+l.name+'" data-time="'+l.time+'" data-point="'+l.point+'" title="기록 삭제">❌</button></span></li>';
         }).join('');
       }
       resolve();
@@ -555,16 +559,35 @@ function loadCustomTab(){
 }
 
 el.customStudentGrid.addEventListener('click',function(e){
-  var btn=e.target.closest('.custom-btn');
-  if(!btn)return;
-  var name=btn.dataset.name;
-  var delta=parseInt(btn.dataset.delta);
-  var reason=el.customReason.value.trim()||'자유항목';
+  var card=e.target.closest('.custom-student-card');
+  if(!card)return;
+  targetCustomStudent=card.dataset.name;
+  el.customModalTitle.textContent='🎯 자유항목 점수 부여 - ' + targetCustomStudent;
+  el.modalCustomReason.value='';
+  el.modalCustomPoint.value=1;
+  el.customModal.classList.add('active');
+  setTimeout(function(){el.modalCustomReason.focus();},100);
+});
+
+el.customModalCancel.addEventListener('click',function(){
+  el.customModal.classList.remove('active');
+});
+el.customModal.addEventListener('click',function(e){
+  if(e.target===el.customModal) el.customModal.classList.remove('active');
+});
+
+el.customModalConfirm.addEventListener('click',function(){
+  if(!targetCustomStudent) return;
+  var name=targetCustomStudent;
+  var reason=el.modalCustomReason.value.trim()||'자유항목';
+  var delta=parseInt(el.modalCustomPoint.value)||0;
+  if(delta===0) { showToast('⚠️ 0점은 부여할 수 없어요'); return; }
+  
+  el.customModal.classList.remove('active');
   var today=getTodayString();
-  
   showLoading(true);
-  var docRef=db.collection('checklist').doc(name+'_'+today);
   
+  var docRef=db.collection('checklist').doc(name+'_'+today);
   db.runTransaction(function(transaction){
     return transaction.get(docRef).then(function(sfDoc){
       if(!sfDoc.exists){
@@ -585,6 +608,41 @@ el.customStudentGrid.addEventListener('click',function(e){
     console.error(e);
     showLoading(false);
     showToast('❌ 기록 실패');
+  });
+});
+
+el.customLogsList.addEventListener('click', function(e) {
+  var btn = e.target.closest('.delete-log-btn');
+  if(!btn) return;
+  var name = btn.dataset.name;
+  var time = parseInt(btn.dataset.time);
+  var point = parseInt(btn.dataset.point);
+  var today = getTodayString();
+  
+  if(!confirm('이 기록을 삭제하시겠습니까? (점수도 되돌려집니다)')) return;
+  
+  showLoading(true);
+  var docRef = db.collection('checklist').doc(name+'_'+today);
+  db.runTransaction(function(transaction){
+    return transaction.get(docRef).then(function(sfDoc){
+      if(!sfDoc.exists) return;
+      var d = sfDoc.data();
+      var logs = d.customLogs || [];
+      var newLogs = logs.filter(function(l) { return l.time !== time; });
+      if(logs.length === newLogs.length) return; // not found
+      
+      var curScore = d.customScore || 0;
+      var newScore = curScore - point; // subtract the points that were added
+      
+      transaction.update(docRef, {customScore: newScore, customLogs: newLogs});
+    });
+  }).then(function(){
+    showLoading(false);
+    showToast('🗑️ 기록이 삭제되었습니다.');
+  }).catch(function(e){
+    console.error(e);
+    showLoading(false);
+    showToast('❌ 삭제 실패');
   });
 });
 
