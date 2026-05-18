@@ -1088,9 +1088,9 @@ body::after {
 }
 .admin-pres-btn:active { transform: scale(0.9); }
 
-/* ===== 4-column stats row ===== */
-.stats-row-4 {
-  grid-template-columns: repeat(4, 1fr);
+/* ===== 6-column stats row ===== */
+.stats-row-6 {
+  grid-template-columns: repeat(6, 1fr);
 }
 
 /* ===== Admin Praise Button (same style as pres) ===== */
@@ -1126,9 +1126,165 @@ body::after {
   font-size: 1rem;
 }
 
+/* ===== Admin Attitude Button ===== */
+.admin-attitude-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #E0E0E0;
+  background: var(--white);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-medium);
+  transition: var(--transition);
+  line-height: 1;
+  padding: 0;
+}
+.admin-attitude-btn:hover {
+  border-color: #81C784;
+  background: #E8F5E9;
+  color: #2E7D32;
+  transform: scale(1.15);
+}
+.admin-attitude-btn:active { transform: scale(0.9); }
+.admin-attitude-val {
+  min-width: 28px;
+  font-weight: 700;
+  color: #388E3C;
+  font-family: 'Jua', sans-serif;
+  font-size: 1rem;
+}
+
+/* ===== Custom Tab UI ===== */
+.custom-item-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.custom-input-box {
+  background: var(--white);
+  padding: 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+.custom-input-box label {
+  display: block;
+  font-family: 'Jua', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text-dark);
+  margin-bottom: 10px;
+}
+.custom-input-box input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: var(--transition);
+}
+.custom-input-box input:focus {
+  border-color: var(--sunflower-yellow);
+  box-shadow: 0 0 0 3px rgba(255,193,7,0.12);
+}
+
+.custom-student-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: var(--shadow-soft);
+  border: 2px solid transparent;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.custom-student-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.custom-student-card .name {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text-dark);
+}
+.custom-ctrl {
+  display: flex;
+  gap: 10px;
+}
+.custom-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: none;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  transition: var(--transition);
+}
+.custom-btn.plus {
+  background: linear-gradient(135deg, #4CAF50, #388E3C);
+  box-shadow: 0 3px 8px rgba(76, 175, 80, 0.3);
+}
+.custom-btn.plus:hover { transform: scale(1.1); box-shadow: 0 5px 12px rgba(76, 175, 80, 0.4); }
+.custom-btn.minus {
+  background: linear-gradient(135deg, #EF5350, #E53935);
+  box-shadow: 0 3px 8px rgba(239, 83, 80, 0.3);
+}
+.custom-btn.minus:hover { transform: scale(1.1); box-shadow: 0 5px 12px rgba(239, 83, 80, 0.4); }
+.custom-btn:active { transform: scale(0.95); }
+
+.custom-logs-box {
+  background: var(--white);
+  padding: 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+.custom-logs-box h3 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text-dark);
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--sunflower-light);
+  padding-bottom: 8px;
+}
+.custom-logs-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.custom-logs-list li {
+  font-size: 0.9rem;
+  color: var(--text-medium);
+  padding: 8px 12px;
+  background: var(--sunflower-cream);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+}
+.custom-logs-list li .log-point {
+  font-weight: 700;
+}
+.custom-logs-list li .log-point.pos { color: #388E3C; }
+.custom-logs-list li .log-point.neg { color: #D32F2F; }
+
 @media (max-width: 480px) {
-  .stats-row-4 {
-    grid-template-columns: repeat(2, 1fr);
+  .stats-row-6 {
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
   }
 }

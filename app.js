@@ -47,21 +47,23 @@ var el={};
  'homework-check','duty-check','homework-status','duty-status','homework-card','duty-card',
  'presentation-count','presentation-minus','presentation-plus','today-points','bonus-hint','admin-btn','back-btn-student','back-btn-admin',
  'password-modal','admin-password','password-error','modal-cancel','modal-confirm',
- 'tab-today','tab-points','tab-history','content-today','content-points','content-history',
- 'today-table-body','points-table-body','stat-homework','stat-duty','stat-presentation','stat-praise',
+ 'tab-today','tab-points','tab-history','tab-custom','content-today','content-points','content-history','content-custom',
+ 'today-table-body','points-table-body','stat-homework','stat-duty','stat-presentation','stat-praise','stat-attitude','stat-custom',
  'loading-overlay','reset-points-btn','reset-modal','reset-cancel','reset-confirm',
  'reset-date-display','search-history-btn','history-summary','history-period-text',
- 'hist-stat-homework','hist-stat-duty','hist-stat-presentation','hist-stat-praise',
+ 'hist-stat-homework','hist-stat-duty','hist-stat-presentation','hist-stat-praise','hist-stat-attitude','hist-stat-custom',
  'history-table-wrapper','history-table-body','history-empty',
- 'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint'
+ 'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
+ 'custom-reason','custom-student-grid','custom-logs-list'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
   el[camel]=document.getElementById(id);
 });
 
 // ===== State =====
-var currentStudent=null, currentData={homework:false,duty:false,presentations:0};
+var currentStudent=null, currentData={homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0,customLogs:[]};
 var unsubscribeSnapshot=null, homeUnsubscribes=[];
+var adminUnsubscribes={today:null, points:null, custom:null};
 var lastResetDate=null; // date string of last reset, null=no reset
 var currentPeriod='daily';
 
@@ -151,7 +153,7 @@ function openStudentPage(student){
   showPage('student');
   if(unsubscribeSnapshot)unsubscribeSnapshot();
   unsubscribeSnapshot=db.collection('checklist').doc(getDocId(student.name)).onSnapshot(function(snap){
-    currentData=snap.exists?snap.data():{homework:false,duty:false,presentations:0};
+    currentData=snap.exists?snap.data():{homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0,customLogs:[]};
     updateStudentUI();
   });
 }
@@ -177,8 +179,10 @@ function updateStudentUI(){
     el.bonusHint.className='bonus-hint'+(remaining===1?' close':'');
   }
   var praise=currentData.praise||0;
-  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;
-  el.todayPoints.textContent=pts+'점'+(bonus>0||praise>0?' ('+(bonus>0?'발표보너스 '+bonus+'점':'')+(bonus>0&&praise>0?' + ':'')+( praise>0?'칭찬쪽지 '+praise+'점':'')+' 포함)':'');
+  var att=currentData.attitude||0;
+  var cust=currentData.customScore||0;
+  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;
+  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+')':'');
 }
 
 function saveStudentData(){
@@ -187,7 +191,10 @@ function saveStudentData(){
     name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),
     homework:currentData.homework||false,duty:currentData.duty||false,
     presentations:currentData.presentations||0,
-    praise:currentData.praise||0
+    praise:currentData.praise||0,
+    attitude:currentData.attitude||0,
+    customScore:currentData.customScore||0,
+    customLogs:currentData.customLogs||[]
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
 
@@ -234,8 +241,8 @@ function checkPassword(){
 }
 el.passwordModal.addEventListener('click',function(e){if(e.target===el.passwordModal)el.passwordModal.classList.remove('active');});
 
-// ===== Tab Switching (3 tabs) =====
-var tabs=['today','points','history'];
+// ===== Tab Switching (4 tabs) =====
+var tabs=['today','points','history','custom'];
 tabs.forEach(function(t){
   document.getElementById('tab-'+t).addEventListener('click',function(){switchTab(t);});
 });
@@ -245,6 +252,7 @@ function switchTab(tab){
     document.getElementById('content-'+t).classList.toggle('active',t===tab);
   });
   if(tab==='today'){showLoading(true);loadTodayStatus().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
+  else if(tab==='custom'){showLoading(true);loadCustomTab().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
 }
 
 // ===== Admin Page =====
@@ -272,51 +280,73 @@ function loadLastReset(){
 
 // ===== Today Status =====
 function loadTodayStatus(){
-  var today=getTodayString(),tHw=0,tDu=0,tPr=0,tPraise=0,rows=[];
-  var promises=STUDENTS.map(function(s){
-    return db.collection('checklist').doc(s.name+'_'+today).get().then(function(snap){
-      var d=snap.exists?snap.data():{homework:false,duty:false,presentations:0,praise:0};
-      if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);
-      rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0});
-    });
-  });
-  return Promise.all(promises).then(function(){
-    rows.sort(function(a,b){return a.id-b.id;});
-    el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
-    el.todayTableBody.innerHTML=rows.map(function(r){
-      return '<tr><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
-        '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
-        '<td>'+(r.duty?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
-        '<td><div class="admin-pres-ctrl">'+
-          '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
-          '<span class="admin-pres-val">'+r.presentations+'</span>'+
-          '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
-        '</div></td>'+
-        '<td><div class="admin-pres-ctrl">'+
-          '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
-          '<span class="admin-praise-val">'+r.praise+'</span>'+
-          '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
-        '</div></td></tr>';
-    }).join('');
+  return new Promise(function(resolve, reject){
+    var today=getTodayString();
+    if(adminUnsubscribes.today) adminUnsubscribes.today();
+    
+    adminUnsubscribes.today = db.collection('checklist').where('date', '==', today).onSnapshot(function(snap){
+      var map={};
+      snap.forEach(function(doc){ map[doc.data().name] = doc.data(); });
+      
+      var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0,rows=[];
+      STUDENTS.forEach(function(s){
+        var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
+        if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0});
+      });
+      
+      rows.sort(function(a,b){return a.id-b.id;});
+      el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
+      el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;
+      el.todayTableBody.innerHTML=rows.map(function(r){
+        return '<tr><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
+          '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
+          '<td>'+(r.duty?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
+          '<td><div class="admin-pres-ctrl">'+
+            '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
+            '<span class="admin-pres-val">'+r.presentations+'</span>'+
+            '<button class="admin-pres-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
+          '</div></td>'+
+          '<td><div class="admin-pres-ctrl">'+
+            '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
+            '<span class="admin-praise-val">'+r.praise+'</span>'+
+            '<button class="admin-praise-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
+          '</div></td>'+
+          '<td><div class="admin-pres-ctrl">'+
+            '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="-1">−</button>'+
+            '<span class="admin-attitude-val">'+r.attitude+'</span>'+
+            '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
+          '</div></td>'+
+          '<td><strong>'+r.customScore+'</strong></td></tr>';
+      }).join('');
+      resolve();
+    }, reject);
   });
 }
 
 // ===== Cumulative Points (since last reset) =====
 function loadCumulativePoints(){
-  return db.collection('checklist').get().then(function(snap){
-    var map={};
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0};});
-    snap.forEach(function(doc){
-      var d=doc.data();
-      if(!d.name||!map[d.name])return;
-      // Only count records after last reset
-      if(lastResetDate && d.date && d.date<lastResetDate)return;
-      if(d.homework)map[d.name].hw++;
-      if(d.duty)map[d.name].du++;
-      map[d.name].pr+=(d.presentations||0);
-      map[d.name].praise+=(d.praise||0);
-    });
-    renderPointsTable(map,el.pointsTableBody);
+  return new Promise(function(resolve, reject){
+    if(adminUnsubscribes.points) adminUnsubscribes.points();
+    
+    adminUnsubscribes.points = db.collection('checklist').onSnapshot(function(snap){
+      var map={};
+      STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
+      snap.forEach(function(doc){
+        var d=doc.data();
+        if(!d.name||!map[d.name])return;
+        // Only count records after last reset
+        if(lastResetDate && d.date && d.date<lastResetDate)return;
+        if(d.homework)map[d.name].hw++;
+        if(d.duty)map[d.name].du++;
+        map[d.name].pr+=(d.presentations||0);
+        map[d.name].praise+=(d.praise||0);
+        map[d.name].att+=(d.attitude||0);
+        map[d.name].cust+=(d.customScore||0);
+      });
+      renderPointsTable(map,el.pointsTableBody);
+      resolve();
+    }, reject);
   });
 }
 
@@ -325,7 +355,7 @@ function renderPointsTable(map,tbody){
   var arr=[];
   Object.keys(map).forEach(function(name){
     var s=map[name]; var bonus=Math.floor(s.pr/3);
-    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,total:s.hw+s.du+bonus+s.praise});
+    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,att:s.att,cust:s.cust,total:s.hw+s.du+bonus+s.praise+s.att+s.cust});
   });
   arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
   tbody.innerHTML=arr.map(function(r,i){
@@ -336,6 +366,8 @@ function renderPointsTable(map,tbody){
       '<td>'+r.hw+'점</td><td>'+r.du+'점</td>'+
       '<td>'+r.bonus+'점 <small style="color:#999">('+r.pr+'회)</small></td>'+
       '<td>'+r.praise+'점</td>'+
+      '<td>'+r.att+'점</td>'+
+      '<td>'+r.cust+'점</td>'+
       '<td><span class="total-points">'+r.total+'</span></td></tr>';
   }).join('');
 }
@@ -369,7 +401,6 @@ el.todayTableBody.addEventListener('click',function(e){
   if(newVal<0){showToast('📊 0회 이하로 줄일 수 없어요');return;}
   var today=getTodayString();
   db.collection('checklist').doc(name+'_'+today).set({presentations:newVal},{merge:true})
-  .then(function(){return loadTodayStatus();})
   .then(function(){showToast('✏️ '+name+' 발표 '+newVal+'회로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
@@ -386,8 +417,22 @@ el.todayTableBody.addEventListener('click',function(e){
   if(newVal<0){showToast('💌 0점 이하로 줄일 수 없어요');return;}
   var today=getTodayString();
   db.collection('checklist').doc(name+'_'+today).set({praise:newVal},{merge:true})
-  .then(function(){return loadTodayStatus();})
   .then(function(){showToast('💌 '+name+' 칭찬쪽지 '+newVal+'점으로 수정했어요');})
+  .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
+});
+
+// ===== Admin: Direct Attitude Edit =====
+el.todayTableBody.addEventListener('click',function(e){
+  var btn=e.target.closest('.admin-attitude-btn');
+  if(!btn)return;
+  var name=btn.dataset.name;
+  var delta=parseInt(btn.dataset.delta);
+  var valSpan=btn.parentElement.querySelector('.admin-attitude-val');
+  var cur=parseInt(valSpan.textContent)||0;
+  var newVal=cur+delta;
+  var today=getTodayString();
+  db.collection('checklist').doc(name+'_'+today).set({attitude:newVal},{merge:true})
+  .then(function(){showToast('⭐ '+name+' 수업태도 '+newVal+'점으로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
 
@@ -440,8 +485,8 @@ function getDateRange(){
 
 function loadHistoryData(startDate,endDate,label){
   return db.collection('checklist').get().then(function(snap){
-    var map={};var tHw=0,tDu=0,tPr=0,tPraise=0;
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0};});
+    var map={};var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0;
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name]||!d.date)return;
@@ -450,17 +495,98 @@ function loadHistoryData(startDate,endDate,label){
         if(d.duty){map[d.name].du++;tDu++;}
         var p=d.presentations||0;map[d.name].pr+=p;tPr+=p;
         var pr=d.praise||0;map[d.name].praise+=pr;tPraise+=pr;
+        var at=d.attitude||0;map[d.name].att+=at;tAtt+=at;
+        var cu=d.customScore||0;map[d.name].cust+=cu;tCust+=cu;
       }
     });
     // Show results
     el.historyPeriodText.textContent='📅 '+label;
     el.histStatHomework.textContent=tHw;el.histStatDuty.textContent=tDu;el.histStatPresentation.textContent=tPr;el.histStatPraise.textContent=tPraise;
+    el.histStatAttitude.textContent=tAtt;el.histStatCustom.textContent=tCust;
     el.historySummary.classList.remove('hidden');
     el.historyTableWrapper.style.display='block';
     el.historyEmpty.style.display='none';
     renderPointsTable(map,el.historyTableBody);
   });
 }
+
+// ===== Admin: Custom Tab =====
+function loadCustomTab(){
+  return new Promise(function(resolve, reject){
+    // 1. Render student grid (only once)
+    if(el.customStudentGrid.innerHTML.trim() === '') {
+      el.customStudentGrid.innerHTML=STUDENTS.map(function(s){
+        return '<div class="custom-student-card"><div class="name">'+s.id+'. '+s.name+'</div>'+
+          '<div class="custom-ctrl">'+
+            '<button class="custom-btn minus" data-name="'+s.name+'" data-delta="-1">−</button>'+
+            '<button class="custom-btn plus" data-name="'+s.name+'" data-delta="1">+</button>'+
+          '</div></div>';
+      }).join('');
+    }
+    
+    // 2. Load recent logs real-time
+    var today=getTodayString();
+    if(adminUnsubscribes.custom) adminUnsubscribes.custom();
+    
+    adminUnsubscribes.custom = db.collection('checklist').where('date','==',today).onSnapshot(function(snap){
+      var allLogs=[];
+      snap.forEach(function(doc){
+        var d=doc.data();
+        if(d.customLogs){
+          d.customLogs.forEach(function(l){
+            allLogs.push({name:d.name,reason:l.reason,point:l.point,time:l.time});
+          });
+        }
+      });
+      allLogs.sort(function(a,b){return b.time-a.time;});
+      if(allLogs.length===0){
+        el.customLogsList.innerHTML='<li><span style="color:#999;">오늘의 기록이 없습니다.</span></li>';
+      } else {
+        el.customLogsList.innerHTML=allLogs.map(function(l){
+          var timeStr=new Date(l.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+          var sign=l.point>0?'+':'';
+          var cname=l.point>0?'pos':'neg';
+          return '<li><span><strong>'+l.name+'</strong> - '+l.reason+' <small>('+timeStr+')</small></span><span class="log-point '+cname+'">'+sign+l.point+'점</span></li>';
+        }).join('');
+      }
+      resolve();
+    }, reject);
+  });
+}
+
+el.customStudentGrid.addEventListener('click',function(e){
+  var btn=e.target.closest('.custom-btn');
+  if(!btn)return;
+  var name=btn.dataset.name;
+  var delta=parseInt(btn.dataset.delta);
+  var reason=el.customReason.value.trim()||'자유항목';
+  var today=getTodayString();
+  
+  showLoading(true);
+  var docRef=db.collection('checklist').doc(name+'_'+today);
+  
+  db.runTransaction(function(transaction){
+    return transaction.get(docRef).then(function(sfDoc){
+      if(!sfDoc.exists){
+        transaction.set(docRef,{name:name,studentId:STUDENTS.find(s=>s.name===name).id,date:today,customScore:delta,customLogs:[{reason:reason,point:delta,time:Date.now()}]});
+      }else{
+        var d=sfDoc.data();
+        var curScore=d.customScore||0;
+        var newScore=curScore+delta;
+        var logs=d.customLogs||[];
+        logs.push({reason:reason,point:delta,time:Date.now()});
+        transaction.update(docRef,{customScore:newScore,customLogs:logs});
+      }
+    });
+  }).then(function(){
+    showLoading(false);
+    showToast('🎯 '+name+' '+delta+'점 기록 완료!');
+  }).catch(function(e){
+    console.error(e);
+    showLoading(false);
+    showToast('❌ 기록 실패');
+  });
+});
 
 // ===== Shake animation =====
 var ss=document.createElement('style');
