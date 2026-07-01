@@ -107,6 +107,18 @@
                     <span class="points-value" id="today-points">0점</span>
                 </div>
             </div>
+
+            <!-- 월간 누적 포인트 & 순위 -->
+            <div class="cumulative-summary" id="cumulative-summary">
+                <div class="cumulative-icon">🏆</div>
+                <div class="cumulative-info">
+                    <span class="cumulative-label" id="cumulative-label">이번 달 누적 현황</span>
+                    <div class="cumulative-values">
+                        <span class="cumulative-points-value" id="cumulative-points">0점</span>
+                        <span class="cumulative-rank-value" id="cumulative-rank">-위</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -333,7 +345,7 @@
                 </div>
 
                 <div class="custom-logs-box">
-                    <h3>최근 기록 (오늘)</h3>
+                    <h3 id="custom-logs-title">최근 기록 (오늘)</h3>
                     <ul class="custom-logs-list" id="custom-logs-list">
                         <!-- JS로 로그 생성 -->
                     </ul>

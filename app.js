@@ -39,6 +39,9 @@ function getMonday(d) {
 function dateToStr(d) {
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
 }
+function getCurrentMonthStartDate() {
+  var n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,'0')+"-01";
+}
 
 // ===== DOM =====
 var pages={home:document.getElementById('home-page'),student:document.getElementById('student-page'),admin:document.getElementById('admin-page')};
@@ -56,7 +59,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
- 'reset-date-input'
+ 'reset-date-input', 'cumulative-points', 'cumulative-rank', 'cumulative-label'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
   el[camel]=document.getElementById(id);
@@ -64,7 +67,7 @@ var el={};
 
 // ===== State =====
 var currentStudent=null, currentData={homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0,customLogs:[]};
-var unsubscribeSnapshot=null, homeUnsubscribes=[];
+var unsubscribeSnapshot=null, unsubscribeCumulative=null, homeUnsubscribes=[];
 var adminUnsubscribes={today:null, points:null, custom:null};
 var lastResetDate=null; // date string of last reset, null=no reset
 var currentPeriod='daily';
@@ -159,6 +162,61 @@ function openStudentPage(student){
     currentData=snap.exists?snap.data():{homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0,customLogs:[]};
     updateStudentUI();
   });
+  startCumulativeListener(student);
+}
+
+function startCumulativeListener(student) {
+  if(unsubscribeCumulative) { unsubscribeCumulative(); unsubscribeCumulative = null; }
+  
+  var startOfCurrentMonth = getCurrentMonthStartDate();
+  var currentMonth = new Date().getMonth() + 1;
+  if(el.cumulativeLabel) el.cumulativeLabel.textContent = currentMonth + '월 누적 현황';
+  
+  var query = db.collection('checklist').where('date', '>=', startOfCurrentMonth);
+  
+  unsubscribeCumulative = query.onSnapshot(function(snap){
+    var map={};
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
+    
+    snap.forEach(function(doc){
+      var d=doc.data();
+      if(!d.name||!map[d.name])return;
+      if(d.date && d.date < startOfCurrentMonth)return;
+      if(d.homework)map[d.name].hw++;
+      if(d.duty)map[d.name].du++;
+      map[d.name].pr+=(d.presentations||0);
+      map[d.name].praise+=(d.praise||0);
+      map[d.name].att+=(d.attitude||0);
+      map[d.name].cust+=(d.customScore||0);
+    });
+    
+    var arr=[];
+    Object.keys(map).forEach(function(name){
+      var s=map[name]; var bonus=Math.floor(s.pr/3);
+      arr.push({id:s.id,name:name,total:s.hw+s.du+bonus+s.praise+s.att+s.cust});
+    });
+    arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
+    
+    var myRank = -1;
+    var myTotal = 0;
+    for(var i=0; i<arr.length; i++){
+      if(arr[i].name === student.name){
+        myRank = i+1;
+        myTotal = arr[i].total;
+        break;
+      }
+    }
+    
+    el.cumulativePoints.textContent = myTotal + '점';
+    el.cumulativeRank.textContent = myRank + '위';
+    
+    el.cumulativeRank.className = 'cumulative-rank-value';
+    if(myRank === 1) el.cumulativeRank.classList.add('gold');
+    else if(myRank === 2) el.cumulativeRank.classList.add('silver');
+    else if(myRank === 3) el.cumulativeRank.classList.add('bronze');
+  }, function(err){
+    console.error("Cumulative listener error:", err);
+  });
 }
 
 function updateStudentUI(){
@@ -224,7 +282,11 @@ el.presentationMinus.addEventListener('click',function(){
   showToast('🎤 발표 '+currentData.presentations+'회로 수정했어요');
 });
 
-el.backBtnStudent.addEventListener('click',function(){if(unsubscribeSnapshot)unsubscribeSnapshot();showPage('home');});
+el.backBtnStudent.addEventListener('click',function(){
+  if(unsubscribeSnapshot)unsubscribeSnapshot();
+  if(unsubscribeCumulative){unsubscribeCumulative(); unsubscribeCumulative=null;}
+  showPage('home');
+});
 el.backBtnAdmin.addEventListener('click',function(){showPage('home');});
 
 // ===== Admin Auth =====
@@ -261,22 +323,24 @@ function switchTab(tab){
 // ===== Admin Page =====
 function openAdminPage(){
   showPage('admin');showLoading(true);
-  loadLastReset().then(function(){
-    return Promise.all([loadTodayStatus(),loadCumulativePoints()]);
-  }).then(function(){showLoading(false);})
+  Promise.all([loadTodayStatus(),loadCumulativePoints()]).then(function(){showLoading(false);})
   .catch(function(e){console.error(e);showToast('❌ 데이터 로드 오류');showLoading(false);});
 }
 
 // ===== Last Reset =====
-function loadLastReset(){
-  return db.collection('resets').orderBy('timestamp','desc').limit(1).get().then(function(snap){
+function listenLastReset(){
+  db.collection('resets').orderBy('timestamp','desc').limit(1).onSnapshot(function(snap){
+    var prevResetDate = lastResetDate;
     if(!snap.empty){
       var d=snap.docs[0].data();
       lastResetDate=d.date;
-      el.resetDateDisplay.textContent=formatDateKR(d.date)+' 이후';
+      if(el.resetDateDisplay) el.resetDateDisplay.textContent=formatDateKR(d.date)+' 이후';
     } else {
       lastResetDate=null;
-      el.resetDateDisplay.textContent='전체 기간';
+      if(el.resetDateDisplay) el.resetDateDisplay.textContent='전체 기간';
+    }
+    if(currentStudent && prevResetDate !== lastResetDate) {
+      startCumulativeListener(currentStudent);
     }
   });
 }
@@ -408,7 +472,13 @@ el.todayTableBody.addEventListener('click',function(e){
   var newVal=cur+delta;
   if(newVal<0){showToast('📊 0회 이하로 줄일 수 없어요');return;}
   var today=getTodayString();
-  db.collection('checklist').doc(name+'_'+today).set({presentations:newVal},{merge:true})
+  var studentId = STUDENTS.find(function(s){return s.name===name;}).id;
+  db.collection('checklist').doc(name+'_'+today).set({
+    name: name,
+    studentId: studentId,
+    date: today,
+    presentations: newVal
+  }, {merge:true})
   .then(function(){showToast('✏️ '+name+' 발표 '+newVal+'회로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
@@ -424,7 +494,13 @@ el.todayTableBody.addEventListener('click',function(e){
   var newVal=cur+delta;
   if(newVal<0){showToast('💌 0점 이하로 줄일 수 없어요');return;}
   var today=getTodayString();
-  db.collection('checklist').doc(name+'_'+today).set({praise:newVal},{merge:true})
+  var studentId = STUDENTS.find(function(s){return s.name===name;}).id;
+  db.collection('checklist').doc(name+'_'+today).set({
+    name: name,
+    studentId: studentId,
+    date: today,
+    praise: newVal
+  }, {merge:true})
   .then(function(){showToast('💌 '+name+' 칭찬쪽지 '+newVal+'점으로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
@@ -439,7 +515,13 @@ el.todayTableBody.addEventListener('click',function(e){
   var cur=parseInt(valSpan.textContent)||0;
   var newVal=cur+delta;
   var today=getTodayString();
-  db.collection('checklist').doc(name+'_'+today).set({attitude:newVal},{merge:true})
+  var studentId = STUDENTS.find(function(s){return s.name===name;}).id;
+  db.collection('checklist').doc(name+'_'+today).set({
+    name: name,
+    studentId: studentId,
+    date: today,
+    attitude: newVal
+  }, {merge:true})
   .then(function(){showToast('⭐ '+name+' 수업태도 '+newVal+'점으로 수정했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
@@ -528,29 +610,35 @@ function loadCustomTab(){
       }).join('');
     }
     
-    // 2. Load recent logs real-time
-    var today=getTodayString();
+    // 2. Load recent logs real-time (current calendar month)
+    var startOfCurrentMonth = getCurrentMonthStartDate();
+    var currentMonth = new Date().getMonth() + 1;
+    var titleEl = document.getElementById('custom-logs-title');
+    if(titleEl) titleEl.textContent = '최근 기록 (' + currentMonth + '월)';
+    
     if(adminUnsubscribes.custom) adminUnsubscribes.custom();
     
-    adminUnsubscribes.custom = db.collection('checklist').where('date','==',today).onSnapshot(function(snap){
+    adminUnsubscribes.custom = db.collection('checklist').where('date','>=',startOfCurrentMonth).onSnapshot(function(snap){
       var allLogs=[];
       snap.forEach(function(doc){
         var d=doc.data();
         if(d.customLogs){
           d.customLogs.forEach(function(l){
-            allLogs.push({name:d.name,reason:l.reason,point:l.point,time:l.time});
+            allLogs.push({name:d.name,reason:l.reason,point:l.point,time:l.time,date:d.date});
           });
         }
       });
       allLogs.sort(function(a,b){return b.time-a.time;});
       if(allLogs.length===0){
-        el.customLogsList.innerHTML='<li><span style="color:#999;">오늘의 기록이 없습니다.</span></li>';
+        el.customLogsList.innerHTML='<li><span style="color:#999;">이번 달 기록이 없습니다.</span></li>';
       } else {
         el.customLogsList.innerHTML=allLogs.map(function(l){
-          var timeStr=new Date(l.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+          var dateObj = new Date(l.time);
+          var dateStr = (dateObj.getMonth()+1) + '/' + dateObj.getDate();
+          var timeStr = dateObj.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
           var sign=l.point>0?'+':'';
           var cname=l.point>0?'pos':'neg';
-          return '<li><span><strong>'+l.name+'</strong> - '+l.reason+' <small>('+timeStr+')</small></span><span class="log-point '+cname+'">'+sign+l.point+'점 <button class="delete-log-btn" data-name="'+l.name+'" data-time="'+l.time+'" data-point="'+l.point+'" title="기록 삭제">❌</button></span></li>';
+          return '<li><span><strong>'+l.name+'</strong> - '+l.reason+' <small>('+dateStr+' '+timeStr+')</small></span><span class="log-point '+cname+'">'+sign+l.point+'점 <button class="delete-log-btn" data-name="'+l.name+'" data-time="'+l.time+'" data-point="'+l.point+'" data-date="'+l.date+'" title="기록 삭제">❌</button></span></li>';
         }).join('');
       }
       resolve();
@@ -617,12 +705,12 @@ el.customLogsList.addEventListener('click', function(e) {
   var name = btn.dataset.name;
   var time = parseInt(btn.dataset.time);
   var point = parseInt(btn.dataset.point);
-  var today = getTodayString();
+  var logDate = btn.dataset.date;
   
   if(!confirm('이 기록을 삭제하시겠습니까? (점수도 되돌려집니다)')) return;
   
   showLoading(true);
-  var docRef = db.collection('checklist').doc(name+'_'+today);
+  var docRef = db.collection('checklist').doc(name+'_'+logDate);
   db.runTransaction(function(transaction){
     return transaction.get(docRef).then(function(sfDoc){
       if(!sfDoc.exists) return;
@@ -652,4 +740,4 @@ ss.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:t
 document.head.appendChild(ss);
 
 // ===== Init =====
-initDates();renderStudentGrid();listenHomeData();
+initDates();renderStudentGrid();listenHomeData();listenLastReset();
