@@ -50,7 +50,10 @@ var el={};
  'homework-check','duty-check','homework-status','duty-status','homework-card','duty-card',
  'presentation-count','presentation-minus','presentation-plus','today-points','bonus-hint','admin-btn','back-btn-student','back-btn-admin',
  'password-modal','admin-password','password-error','modal-cancel','modal-confirm',
- 'tab-today','tab-points','tab-history','tab-custom','content-today','content-points','content-history','content-custom',
+ 'student-pin-modal','student-pin-title','student-pin-subtitle','student-pin-input','student-pin-error','student-pin-cancel','student-pin-confirm',
+ 'student-pin-setup-modal','student-pin-setup-title','student-pin-new','student-pin-confirm-input','student-pin-setup-error','student-pin-setup-cancel','student-pin-setup-confirm',
+ 'tab-today','tab-points','tab-history','tab-custom','tab-pins',
+ 'content-today','content-points','content-history','content-custom','content-pins',
  'today-table-body','points-table-body','stat-homework','stat-duty','stat-presentation','stat-praise','stat-attitude','stat-custom',
  'loading-overlay','reset-points-btn','reset-modal','reset-cancel','reset-confirm',
  'reset-date-display','search-history-btn','history-summary','history-period-text',
@@ -59,7 +62,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
- 'reset-date-input', 'cumulative-points', 'cumulative-rank', 'cumulative-label'
+ 'reset-date-input', 'cumulative-points', 'cumulative-rank', 'cumulative-label', 'pins-table-body'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
   el[camel]=document.getElementById(id);
@@ -128,10 +131,92 @@ function renderStudentGrid(){
       '<div class="status-dots"><div class="status-dot" id="dot-hw-'+s.id+'" title="숙제"></div>'+
       '<div class="status-dot" id="dot-duty-'+s.id+'" title="1인1역"></div>'+
       '<div class="status-dot" id="dot-pres-'+s.id+'" title="발표"></div></div>';
-    c.addEventListener('click',function(){openStudentPage(s);});
+    c.addEventListener('click',function(){handleStudentClick(s);});
     el.studentGrid.appendChild(c);
   });
 }
+
+var pendingStudent = null;
+var pendingPin = null;
+
+function handleStudentClick(student) {
+  showLoading(true);
+  db.collection('studentPins').doc(student.name).get().then(function(doc){
+    showLoading(false);
+    pendingStudent = student;
+    if(doc.exists && doc.data().pin) {
+      pendingPin = doc.data().pin;
+      el.studentPinInput.value = '';
+      el.studentPinError.classList.remove('show');
+      el.studentPinModal.classList.add('active');
+      setTimeout(function(){el.studentPinInput.focus();}, 100);
+    } else {
+      el.studentPinNew.value = '';
+      el.studentPinConfirmInput.value = '';
+      el.studentPinSetupError.classList.remove('show');
+      el.studentPinSetupModal.classList.add('active');
+      setTimeout(function(){el.studentPinNew.focus();}, 100);
+    }
+  }).catch(function(err){
+    console.error("Error fetching PIN:", err);
+    showLoading(false);
+    showToast('❌ 데이터를 불러오는데 실패했습니다.');
+  });
+}
+
+el.studentPinCancel.addEventListener('click', function(){
+  el.studentPinModal.classList.remove('active');
+  pendingStudent = null;
+  pendingPin = null;
+});
+
+el.studentPinConfirm.addEventListener('click', function(){
+  var input = el.studentPinInput.value;
+  if(input === pendingPin || input === ADMIN_PASSWORD) {
+    el.studentPinModal.classList.remove('active');
+    openStudentPage(pendingStudent);
+  } else {
+    el.studentPinError.classList.add('show');
+    el.studentPinInput.value = '';
+    el.studentPinInput.focus();
+  }
+});
+el.studentPinInput.addEventListener('keydown',function(e){if(e.key==='Enter')el.studentPinConfirm.click();});
+
+el.studentPinSetupCancel.addEventListener('click', function(){
+  el.studentPinSetupModal.classList.remove('active');
+  pendingStudent = null;
+});
+
+el.studentPinSetupConfirm.addEventListener('click', function(){
+  var p1 = el.studentPinNew.value;
+  var p2 = el.studentPinConfirmInput.value;
+  if(p1.length !== 4) {
+    el.studentPinSetupError.textContent = '비밀번호 4자리를 입력해주세요.';
+    el.studentPinSetupError.classList.add('show');
+    return;
+  }
+  if(p1 !== p2) {
+    el.studentPinSetupError.textContent = '비밀번호가 일치하지 않습니다.';
+    el.studentPinSetupError.classList.add('show');
+    return;
+  }
+  
+  showLoading(true);
+  db.collection('studentPins').doc(pendingStudent.name).set({
+    pin: p1,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    showLoading(false);
+    el.studentPinSetupModal.classList.remove('active');
+    showToast('🔑 비밀번호가 설정되었습니다.');
+    openStudentPage(pendingStudent);
+  }).catch(function(err){
+    console.error("Error setting PIN:", err);
+    showLoading(false);
+    showToast('❌ 비밀번호 설정에 실패했습니다.');
+  });
+});
 
 function updateHomeDots(sid,data){
   var hw=document.getElementById('dot-hw-'+sid),du=document.getElementById('dot-duty-'+sid),pr=document.getElementById('dot-pres-'+sid);
@@ -307,7 +392,7 @@ function checkPassword(){
 el.passwordModal.addEventListener('click',function(e){if(e.target===el.passwordModal)el.passwordModal.classList.remove('active');});
 
 // ===== Tab Switching (4 tabs) =====
-var tabs=['today','points','history','custom'];
+var tabs=['today','points','history','custom','pins'];
 tabs.forEach(function(t){
   document.getElementById('tab-'+t).addEventListener('click',function(){switchTab(t);});
 });
@@ -318,6 +403,7 @@ function switchTab(tab){
   });
   if(tab==='today'){showLoading(true);loadTodayStatus().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
   else if(tab==='custom'){showLoading(true);loadCustomTab().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
+  else if(tab==='pins'){showLoading(true);loadPinsTab().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
 }
 
 // ===== Admin Page =====
@@ -731,6 +817,44 @@ el.customLogsList.addEventListener('click', function(e) {
     console.error(e);
     showLoading(false);
     showToast('❌ 삭제 실패');
+  });
+});
+
+// ===== Admin: Pins Tab =====
+function loadPinsTab(){
+  return new Promise(function(resolve, reject){
+    db.collection('studentPins').get().then(function(snap){
+      var map={};
+      snap.forEach(function(doc){ map[doc.id] = doc.data(); });
+      
+      var rows = STUDENTS.map(function(s){
+        var hasPin = map[s.name] && map[s.name].pin;
+        var statusBadge = hasPin ? '<span class="pin-status-badge set">설정됨</span>' : '<span class="pin-status-badge unset">미설정</span>';
+        var resetBtn = hasPin ? '<button class="pin-reset-btn" data-name="'+s.name+'">초기화</button>' : '<button class="pin-reset-btn" disabled>초기화</button>';
+        return '<tr><td>'+s.id+'</td><td><strong>'+s.name+'</strong></td><td>'+statusBadge+'</td><td>'+resetBtn+'</td></tr>';
+      });
+      el.pinsTableBody.innerHTML = rows.join('');
+      resolve();
+    }).catch(reject);
+  });
+}
+
+el.pinsTableBody.addEventListener('click', function(e){
+  var btn = e.target.closest('.pin-reset-btn');
+  if(!btn || btn.disabled) return;
+  var name = btn.dataset.name;
+  
+  if(!confirm(name + ' 학생의 비밀번호를 초기화하시겠습니까? 초기화 후 학생이 다시 접속하여 비밀번호를 설정할 수 있습니다.')) return;
+  
+  showLoading(true);
+  db.collection('studentPins').doc(name).delete().then(function(){
+    showLoading(false);
+    showToast('🔑 ' + name + ' 학생의 비밀번호가 초기화되었습니다.');
+    loadPinsTab();
+  }).catch(function(err){
+    console.error("Error resetting PIN:", err);
+    showLoading(false);
+    showToast('❌ 초기화에 실패했습니다.');
   });
 });
 

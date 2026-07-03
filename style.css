@@ -523,12 +523,12 @@ body::after {
 
 .tab {
   flex: 1;
-  padding: 12px;
+  padding: 12px 6px;
   border: none;
   background: transparent;
   border-radius: 10px;
   font-family: 'Jua', sans-serif;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--text-medium);
   cursor: pointer;
   transition: var(--transition);
@@ -1385,3 +1385,92 @@ body::after {
   }
 }
 
+/* ===== PIN Management ===== */
+.pin-setup-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.pin-setup-group label {
+  font-size: 0.9rem;
+  color: var(--text-medium);
+  margin-bottom: 4px;
+}
+
+.pin-setup-group input {
+  padding: 10px 12px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: var(--transition);
+  text-align: center;
+  letter-spacing: 4px;
+}
+
+.pin-setup-group input:focus {
+  border-color: var(--sunflower-yellow);
+}
+
+.pin-manage-container {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.pin-manage-header {
+  padding: 16px 20px;
+  background: var(--sunflower-cream);
+  border-bottom: 2px solid var(--sunflower-light);
+}
+
+.pin-manage-header h3 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.2rem;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+
+.pin-manage-header p {
+  font-size: 0.85rem;
+  color: var(--text-medium);
+}
+
+.pin-status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.pin-status-badge.set {
+  background: rgba(102, 187, 106, 0.2);
+  color: #388E3C;
+}
+.pin-status-badge.unset {
+  background: rgba(244, 67, 54, 0.2);
+  color: #D32F2F;
+}
+
+.pin-reset-btn {
+  background: #F5F5F5;
+  border: 1px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.pin-reset-btn:hover:not(:disabled) {
+  background: #E0E0E0;
+}
+.pin-reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
