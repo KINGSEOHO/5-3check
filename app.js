@@ -18,7 +18,7 @@ var STUDENTS = [
   {id:17,name:"박세아"},{id:18,name:"박예솜"},{id:19,name:"신수아"},{id:20,name:"심해나"},
   {id:21,name:"장하나"},{id:22,name:"정유주"}
 ];
-var ADMIN_PASSWORD = "1234";
+var ADMIN_PASSWORD = "9494";
 
 // ===== Utilities =====
 function getTodayString() {
