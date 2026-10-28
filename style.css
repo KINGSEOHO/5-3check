@@ -519,11 +519,13 @@ body::after {
   border-radius: var(--radius-sm);
   padding: 4px;
   margin-bottom: 16px;
+  overflow-x: auto;
 }
 
 .tab {
   flex: 1;
-  padding: 12px 6px;
+  white-space: nowrap;
+  padding: 12px 8px;
   border: none;
   background: transparent;
   border-radius: 10px;
@@ -1569,4 +1571,107 @@ body::after {
 .admin-snack-btn.given {
   background: #E8F5E9;
   color: var(--leaf-green);
+}
+
+/* ===== Mission Management (미션 관리 탭) ===== */
+.mission-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mission-edit-section {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.mission-edit-section h4 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.05rem;
+  color: var(--text-dark);
+}
+
+.mission-edit-desc {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin: 2px 0 10px;
+}
+
+.mission-edit-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.mission-edit-icon,
+.mission-edit-text,
+.mission-edit-ids {
+  padding: 8px 10px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: var(--transition);
+}
+
+.mission-edit-icon {
+  width: 52px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.mission-edit-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-edit-ids {
+  width: 100%;
+}
+
+.mission-edit-icon:focus,
+.mission-edit-text:focus,
+.mission-edit-ids:focus {
+  border-color: var(--sunflower-yellow);
+}
+
+.mission-edit-del {
+  width: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #FFEBEE;
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mission-edit-add {
+  margin-top: 4px;
+  padding: 8px 14px;
+  border: 2px dashed var(--sunflower-gold);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-medium);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mission-edit-names {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--text-medium);
+}
+
+.mission-manage-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.mission-manage-actions button {
+  flex: 1;
 }

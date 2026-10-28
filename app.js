@@ -71,9 +71,9 @@ var MISSION_POOL_BASIC_B = [
   {icon:"🏠",text:"친구에게 \"잘 가\" 인사하기"},
   {icon:"✅",text:"질문을 받으면 \"네\" 또는 \"아니요\"로 대답하기"},
   {icon:"😄",text:"친구에게 \"좋아\" 한 마디 해주기"},
-  {icon:"🌼",text:"친구에게 \"도와줄 수 있어?\" 말하고 같이 하기"}
+  {icon:"🌼",text:"스스로 할 수 있는 일도 \"도와줄 수 있어?\" 하고 물어보고 같이 하기"}
 ];
-var BASIC_MISSION_STUDENT_IDS = [21];
+var BASIC_MISSION_STUDENT_IDS = [21]; // 기본값. 관리자 '미션 관리' 탭에서 바꾸면 그 값을 사용
 var MISSION_HINT_DEFAULT = "말이 어려우면 손짓, 웃음, 쪽지로 전해도 좋아요 😊";
 var MISSION_HINT_BASIC = "작은 목소리로 한 마디면 충분해요 🌱";
 function getDayNumber(){
@@ -81,9 +81,36 @@ function getDayNumber(){
 }
 function getTodayMissions(student){
   var day=getDayNumber();
-  var basic=!!student && BASIC_MISSION_STUDENT_IDS.indexOf(student.id)!==-1;
-  var a=basic?MISSION_POOL_BASIC_A:MISSION_POOL_A, b=basic?MISSION_POOL_BASIC_B:MISSION_POOL_B;
-  return {missions:[a[day%a.length], b[(day*3+1)%b.length]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+  var c=missionConfig;
+  var basic=!!student && c.basicIds.indexOf(student.id)!==-1;
+  var a=basic?c.basicA:c.poolA, b=basic?c.basicB:c.poolB;
+  return {missions:[a[day%a.length], b[(day+Math.floor(b.length/2))%b.length]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+}
+
+// 관리자 '미션 관리' 탭에서 저장한 목록 (Firestore settings/missions). 없거나 읽기 실패하면 위 기본 목록 사용.
+var DEFAULT_MISSION_CONFIG = {poolA:MISSION_POOL_A,poolB:MISSION_POOL_B,basicA:MISSION_POOL_BASIC_A,basicB:MISSION_POOL_BASIC_B,basicIds:BASIC_MISSION_STUDENT_IDS};
+var MISSION_LIST_KEYS = ['poolA','poolB','basicA','basicB'];
+function cloneMissionConfig(c){return JSON.parse(JSON.stringify(c));}
+function normalizeMissionConfig(raw){
+  var cfg=cloneMissionConfig(DEFAULT_MISSION_CONFIG);
+  if(!raw)return cfg;
+  MISSION_LIST_KEYS.forEach(function(k){
+    if(!Array.isArray(raw[k]))return;
+    var list=raw[k].filter(function(m){return m&&typeof m.text==='string'&&m.text.trim();})
+      .map(function(m){return {icon:(typeof m.icon==='string'&&m.icon.trim())?m.icon.trim():'⭐',text:m.text.trim()};});
+    if(list.length)cfg[k]=list;
+  });
+  if(Array.isArray(raw.basicIds)){
+    cfg.basicIds=raw.basicIds.filter(function(n){return Number.isInteger(n)&&n>=1&&n<=STUDENTS.length;});
+  }
+  return cfg;
+}
+var missionConfig=cloneMissionConfig(DEFAULT_MISSION_CONFIG);
+function listenMissionConfig(){
+  db.collection('settings').doc('missions').onSnapshot(function(snap){
+    missionConfig=normalizeMissionConfig(snap.exists?snap.data():null);
+    if(currentStudent&&pages.student.classList.contains('active'))updateStudentUI();
+  },function(err){console.error('미션 설정 읽기 오류:',err);});
 }
 
 // ===== Utilities =====
@@ -128,6 +155,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
+ 'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
  'mission-hint','mission-snack','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
  'mission-card-b','mission-icon-b','mission-text-b','mission-status-b','mission-check-b','stat-mission','hist-stat-mission',
  'reset-date-input', 'cumulative-points', 'cumulative-label', 'pins-table-body'
@@ -466,7 +494,7 @@ function checkPassword(){
 el.passwordModal.addEventListener('click',function(e){if(e.target===el.passwordModal)el.passwordModal.classList.remove('active');});
 
 // ===== Tab Switching (4 tabs) =====
-var tabs=['today','points','history','custom','pins'];
+var tabs=['today','points','history','custom','pins','missions'];
 tabs.forEach(function(t){
   document.getElementById('tab-'+t).addEventListener('click',function(){switchTab(t);});
 });
@@ -478,6 +506,7 @@ function switchTab(tab){
   if(tab==='today'){showLoading(true);loadTodayStatus().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
   else if(tab==='custom'){showLoading(true);loadCustomTab().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
   else if(tab==='pins'){showLoading(true);loadPinsTab().then(function(){showLoading(false);}).catch(function(){showLoading(false);});}
+  else if(tab==='missions'){loadMissionsTab();}
 }
 
 // ===== Admin Page =====
@@ -953,10 +982,97 @@ el.pinsTableBody.addEventListener('click', function(e){
   });
 });
 
+// ===== Admin: Missions Tab (미션 관리) =====
+var MISSION_LIST_DEFS=[
+  {key:'poolA',title:'일반 ① 마음 표현',desc:'모든 학생에게 하루 첫 번째 미션으로 나와요.'},
+  {key:'poolB',title:'일반 ② 함께하기·도와주기',desc:'모든 학생에게 하루 두 번째 미션으로 나와요.'},
+  {key:'basicA',title:'쉬운 단계 ① 행동',desc:'아래 지정한 학생에게 첫 번째 미션으로 나와요. 부담 없는 행동 위주로 적어주세요.'},
+  {key:'basicB',title:'쉬운 단계 ② 한 마디 말하기',desc:'아래 지정한 학생에게 두 번째 미션으로 나와요. 말하기 미션을 적어주세요.'}
+];
+var missionDraft=null;
+
+function loadMissionsTab(){
+  missionDraft=cloneMissionConfig(missionConfig);
+  renderMissionEditor();
+}
+
+function parseStudentIds(str){
+  var ids=[];
+  (str||'').split(/[\s,]+/).forEach(function(t){
+    var n=parseInt(t,10);
+    if(Number.isInteger(n)&&n>=1&&n<=STUDENTS.length&&ids.indexOf(n)===-1)ids.push(n);
+  });
+  return ids.sort(function(a,b){return a-b;});
+}
+
+function updateMissionBasicNames(){
+  el.missionBasicNames.textContent=missionDraft.basicIds.map(function(id){
+    var s=STUDENTS.find(function(x){return x.id===id;});return id+'번 '+(s?s.name:'');
+  }).join(', ')||'지정된 학생이 없어요';
+}
+
+function renderMissionEditor(){
+  var box=el.missionEditors;box.innerHTML='';
+  MISSION_LIST_DEFS.forEach(function(def){
+    var list=missionDraft[def.key];
+    var sec=document.createElement('div');sec.className='mission-edit-section';
+    var h=document.createElement('h4');h.textContent=def.title+' ('+list.length+'개)';sec.appendChild(h);
+    var p=document.createElement('p');p.className='mission-edit-desc';p.textContent=def.desc;sec.appendChild(p);
+    list.forEach(function(item,i){
+      var row=document.createElement('div');row.className='mission-edit-row';
+      var ic=document.createElement('input');ic.className='mission-edit-icon';ic.value=item.icon;ic.maxLength=4;ic.setAttribute('aria-label','아이콘');
+      ic.addEventListener('input',function(){item.icon=ic.value;});
+      var tx=document.createElement('input');tx.className='mission-edit-text';tx.value=item.text;tx.maxLength=80;tx.setAttribute('aria-label','미션 문구');
+      tx.addEventListener('input',function(){item.text=tx.value;});
+      var del=document.createElement('button');del.className='mission-edit-del';del.textContent='✕';del.title='삭제';
+      del.addEventListener('click',function(){list.splice(i,1);renderMissionEditor();});
+      row.appendChild(ic);row.appendChild(tx);row.appendChild(del);sec.appendChild(row);
+    });
+    var add=document.createElement('button');add.className='mission-edit-add';add.textContent='+ 미션 추가';
+    add.addEventListener('click',function(){
+      list.push({icon:'⭐',text:''});renderMissionEditor();
+      var rows=box.querySelectorAll('.mission-edit-section')[MISSION_LIST_DEFS.indexOf(def)].querySelectorAll('.mission-edit-text');
+      if(rows.length)rows[rows.length-1].focus();
+    });
+    sec.appendChild(add);
+    box.appendChild(sec);
+  });
+  el.missionBasicIds.value=missionDraft.basicIds.join(', ');
+  updateMissionBasicNames();
+}
+
+el.missionBasicIds.addEventListener('input',function(){
+  missionDraft.basicIds=parseStudentIds(el.missionBasicIds.value);updateMissionBasicNames();
+});
+
+el.missionResetDefault.addEventListener('click',function(){
+  if(!confirm('기본 미션 목록으로 되돌릴까요?\n(저장을 눌러야 실제로 적용돼요)'))return;
+  missionDraft=cloneMissionConfig(DEFAULT_MISSION_CONFIG);renderMissionEditor();
+  showToast('↩️ 기본 목록을 불러왔어요. 저장을 눌러야 적용돼요');
+});
+
+el.missionSave.addEventListener('click',function(){
+  var cfg=cloneMissionConfig(missionDraft);
+  for(var i=0;i<MISSION_LIST_DEFS.length;i++){
+    var def=MISSION_LIST_DEFS[i];
+    cfg[def.key]=cfg[def.key].filter(function(m){return m.text&&m.text.trim();}).map(function(m){
+      return {icon:(m.icon&&m.icon.trim())||'⭐',text:m.text.trim()};
+    });
+    if(!cfg[def.key].length){showToast('❌ "'+def.title+'" 목록에 미션이 1개 이상 있어야 해요');return;}
+  }
+  showLoading(true);
+  db.collection('settings').doc('missions').set(cfg)
+  .then(function(){
+    showLoading(false);showToast('✅ 미션 목록을 저장했어요');
+    missionDraft=cloneMissionConfig(normalizeMissionConfig(cfg));renderMissionEditor();
+  })
+  .catch(function(e){console.error(e);showLoading(false);showToast('❌ 저장 오류 (Firestore 규칙을 확인해 주세요)');});
+});
+
 // ===== Shake animation =====
 var ss=document.createElement('style');
 ss.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}';
 document.head.appendChild(ss);
 
 // ===== Init =====
-initDates();renderStudentGrid();listenHomeData();listenLastReset();
+initDates();renderStudentGrid();listenHomeData();listenLastReset();listenMissionConfig();
