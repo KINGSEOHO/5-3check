@@ -84,7 +84,17 @@ function getTodayMissions(student){
   var c=missionConfig;
   var basic=!!student && c.basicIds.indexOf(student.id)!==-1;
   var a=basic?c.basicA:c.poolA, b=basic?c.basicB:c.poolB;
-  return {missions:[a[day%a.length], b[(day+Math.floor(b.length/2))%b.length]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+  var sid=student?student.id:0;
+  var ia=(day+sid*missionStride(a.length))%a.length;
+  var ib=(day+sid*missionStride(b.length)+Math.floor(b.length/2))%b.length;
+  return {missions:[a[ia], b[ib]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+}
+function gcd(x,y){return y?gcd(y,x%y):x;}
+// 목록 길이와 서로소인 간격 -> 학생 번호가 1씩 늘 때 목록 위치가 이만큼 건너뛰고, 모든 항목이 고르게 쓰임
+function missionStride(len){
+  var s=Math.max(1,Math.round(len*0.38));
+  while(gcd(s,len)!==1)s++;
+  return s;
 }
 
 // 관리자 '미션 관리' 탭에서 저장한 목록 (Firestore settings/missions). 없거나 읽기 실패하면 위 기본 목록 사용.
@@ -155,6 +165,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
+ 'mission-confirm-btn','teacher-confirm-modal','tc-mission-list','tc-password','tc-error','tc-cancel','tc-confirm',
  'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
  'mission-hint','mission-snack','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
  'mission-card-b','mission-icon-b','mission-text-b','mission-status-b','mission-check-b','stat-mission','hist-stat-mission',
@@ -417,6 +428,9 @@ function updateStudentUI(){
   if(mis===2&&currentData.snackGiven){el.missionSnack.textContent='🍪 오늘 간식을 받았어요! 내일도 도전해 봐요 💛';el.missionSnack.className='mission-snack given';}
   else if(mis===2){el.missionSnack.textContent='🎉 미션 2개 완료! 선생님께 오면 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack ready';}
   else{el.missionSnack.textContent='미션 2개를 모두 하면 선생님께 와서 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack';}
+  el.missionConfirmBtn.style.display=(mis===2&&!currentData.snackGiven)?'block':'none';
+  // 선생님이 확인한 뒤에는 미션 체크를 바꿀 수 없게 잠금 (관리자 화면에서 지급 취소하면 다시 풀림)
+  el.missionCheckA.disabled=el.missionCheckB.disabled=!!currentData.snackGiven;
   var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;
   el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+')':'');
 }
@@ -453,6 +467,37 @@ function bindMissionCheck(input,field){
     if(input.checked){showToast('🤝 미션 완료! 따뜻한 마음이 전해졌어요 💛');miniConfetti();}
   });
 }
+function openTeacherConfirm(){
+  if(!currentStudent)return;
+  el.tcMissionList.innerHTML='';
+  getTodayMissions(currentStudent).missions.forEach(function(m){
+    var li=document.createElement('li');li.textContent=m.icon+' '+m.text;el.tcMissionList.appendChild(li);
+  });
+  el.tcPassword.value='';el.tcError.classList.remove('show');
+  el.teacherConfirmModal.classList.add('active');
+  setTimeout(function(){el.tcPassword.focus();},100);
+}
+function closeTeacherConfirm(){el.teacherConfirmModal.classList.remove('active');}
+function submitTeacherConfirm(){
+  if(el.tcPassword.value!==ADMIN_PASSWORD){
+    el.tcError.classList.add('show');el.tcPassword.value='';
+    el.tcPassword.style.animation='shake 0.5s ease';
+    setTimeout(function(){el.tcPassword.style.animation='';},500);
+    return;
+  }
+  if(!currentStudent||!currentData.mission1||!currentData.mission2){closeTeacherConfirm();return;}
+  db.collection('checklist').doc(getDocId(currentStudent.name)).set({
+    name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),snackGiven:true
+  },{merge:true})
+  .then(function(){closeTeacherConfirm();showToast('🍪 선생님 확인 완료! 간식을 받아가세요');miniConfetti();})
+  .catch(function(e){console.error(e);showToast('❌ 저장 오류');});
+}
+el.missionConfirmBtn.addEventListener('click',openTeacherConfirm);
+el.tcCancel.addEventListener('click',closeTeacherConfirm);
+el.tcConfirm.addEventListener('click',submitTeacherConfirm);
+el.tcPassword.addEventListener('keydown',function(e){if(e.key==='Enter')submitTeacherConfirm();});
+el.teacherConfirmModal.addEventListener('click',function(e){if(e.target===el.teacherConfirmModal)closeTeacherConfirm();});
+
 bindMissionCheck(el.missionCheckA,'mission1');
 bindMissionCheck(el.missionCheckB,'mission2');
 el.presentationPlus.addEventListener('click',function(){

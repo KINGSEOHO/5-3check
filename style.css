@@ -1675,3 +1675,48 @@ body::after {
 .mission-manage-actions button {
   flex: 1;
 }
+
+/* ===== Teacher Confirm (선생님 최종 확인) ===== */
+.mission-confirm-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--leaf-green), var(--stem-green));
+  color: var(--white);
+  font-family: 'Jua', sans-serif;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+
+.mission-confirm-btn:active {
+  transform: scale(0.98);
+}
+
+.tc-mission-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--sunflower-light);
+  text-align: left;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-dark);
+}
+
+#tc-password {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  font-size: 1.2rem;
+  text-align: center;
+  letter-spacing: 6px;
+  outline: none;
+}
+
+#tc-password:focus {
+  border-color: var(--sunflower-yellow);
+}

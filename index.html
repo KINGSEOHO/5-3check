@@ -129,6 +129,7 @@
                     </label>
                 </div>
                 <p class="mission-snack" id="mission-snack"></p>
+                <button class="mission-confirm-btn" id="mission-confirm-btn" style="display:none;">👩‍🏫 선생님 확인</button>
             </div>
 
             <!-- 오늘의 포인트 요약 -->
@@ -493,6 +494,22 @@
             <div class="modal-buttons">
                 <button class="modal-cancel" id="reset-cancel">취소</button>
                 <button class="modal-confirm" id="reset-confirm">초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 선생님 최종 확인 모달 (간식 지급) ===== -->
+    <div class="modal-overlay" id="teacher-confirm-modal">
+        <div class="modal">
+            <div class="modal-icon">👩‍🏫</div>
+            <h3>선생님 확인</h3>
+            <p>오늘의 미션을 확인한 뒤 비밀번호를 입력하면 간식 지급이 확정돼요.</p>
+            <ul class="tc-mission-list" id="tc-mission-list"></ul>
+            <input type="password" id="tc-password" placeholder="••••" maxlength="4" inputmode="numeric" autocomplete="off">
+            <div class="modal-error" id="tc-error">비밀번호가 틀립니다</div>
+            <div class="modal-buttons">
+                <button class="modal-cancel" id="tc-cancel">취소</button>
+                <button class="modal-confirm" id="tc-confirm">간식 지급 확인</button>
             </div>
         </div>
     </div>
