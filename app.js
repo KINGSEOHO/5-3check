@@ -128,9 +128,9 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
- 'mission-hint','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
+ 'mission-hint','mission-snack','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
  'mission-card-b','mission-icon-b','mission-text-b','mission-status-b','mission-check-b','stat-mission','hist-stat-mission',
- 'reset-date-input', 'cumulative-points', 'cumulative-rank', 'cumulative-label', 'pins-table-body'
+ 'reset-date-input', 'cumulative-points', 'cumulative-label', 'pins-table-body'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
   el[camel]=document.getElementById(id);
@@ -325,7 +325,7 @@ function startCumulativeListener(student) {
   var currentMonth = new Date().getMonth() + 1;
   if(el.cumulativeLabel) el.cumulativeLabel.textContent = currentMonth + '월 누적 현황';
   
-  var query = db.collection('checklist').where('date', '>=', startOfCurrentMonth);
+  var query = db.collection('checklist').where('name', '==', student.name);
   
   unsubscribeCumulative = query.onSnapshot(function(snap){
     var map={};
@@ -344,30 +344,9 @@ function startCumulativeListener(student) {
       map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
     });
     
-    var arr=[];
-    Object.keys(map).forEach(function(name){
-      var s=map[name]; var bonus=Math.floor(s.pr/3);
-      arr.push({id:s.id,name:name,total:s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi});
-    });
-    arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
-    
-    var myRank = -1;
-    var myTotal = 0;
-    for(var i=0; i<arr.length; i++){
-      if(arr[i].name === student.name){
-        myRank = i+1;
-        myTotal = arr[i].total;
-        break;
-      }
-    }
-    
+    var s=map[student.name]; var bonus=Math.floor(s.pr/3);
+    var myTotal=s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi;
     el.cumulativePoints.textContent = myTotal + '점';
-    el.cumulativeRank.textContent = myRank + '위';
-    
-    el.cumulativeRank.className = 'cumulative-rank-value';
-    if(myRank === 1) el.cumulativeRank.classList.add('gold');
-    else if(myRank === 2) el.cumulativeRank.classList.add('silver');
-    else if(myRank === 3) el.cumulativeRank.classList.add('bronze');
   }, function(err){
     console.error("Cumulative listener error:", err);
   });
@@ -407,6 +386,9 @@ function updateStudentUI(){
     el['missionCard'+m[0]].classList.toggle('checked',m[2]);
   });
   var mis=(currentData.mission1?1:0)+(currentData.mission2?1:0);
+  if(mis===2&&currentData.snackGiven){el.missionSnack.textContent='🍪 오늘 간식을 받았어요! 내일도 도전해 봐요 💛';el.missionSnack.className='mission-snack given';}
+  else if(mis===2){el.missionSnack.textContent='🎉 미션 2개 완료! 선생님께 오면 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack ready';}
+  else{el.missionSnack.textContent='미션 2개를 모두 하면 선생님께 와서 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack';}
   var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;
   el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+')':'');
 }
@@ -423,6 +405,7 @@ function saveStudentData(){
     customLogs:currentData.customLogs||[],
     mission1:!!currentData.mission1,
     mission2:!!currentData.mission2,
+    snackGiven:!!currentData.snackGiven,
     missionTexts:getTodayMissions(currentStudent).missions.map(function(m){return m.text;})
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
@@ -537,7 +520,7 @@ function loadTodayStatus(){
         var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
         if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
         var mi=(d.mission1?1:0)+(d.mission2?1:0);tMi+=mi;
-        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi});
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,snack:!!d.snackGiven});
       });
       
       rows.sort(function(a,b){return a.id-b.id;});
@@ -563,7 +546,8 @@ function loadTodayStatus(){
             '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
           '</div></td>'+
           '<td><strong>'+r.customScore+'</strong></td>'+
-          '<td><strong>'+r.mission+'</strong></td></tr>';
+          '<td><strong>'+r.mission+'</strong></td>'+
+          '<td>'+(r.mission>=2?'<button class="admin-snack-btn'+(r.snack?' given':'')+'" data-name="'+r.name+'" data-given="'+(r.snack?1:0)+'">'+(r.snack?'✔ 지급됨':'🍪 주기')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
       }).join('');
       resolve();
     }, reject);
@@ -640,6 +624,21 @@ el.resetConfirm.addEventListener('click',function(){
   }).then(function(){
     showLoading(false);showToast('✅ 포인트 누적 기준일이 변경되었습니다');
   }).catch(function(e){console.error(e);showLoading(false);showToast('❌ 초기화 오류');});
+});
+
+// ===== Admin: Snack Check (미션 2개 완료 간식 지급) =====
+el.todayTableBody.addEventListener('click',function(e){
+  var btn=e.target.closest('.admin-snack-btn');
+  if(!btn)return;
+  var name=btn.dataset.name;
+  var give=btn.dataset.given!=='1';
+  var today=getTodayString();
+  var studentId=STUDENTS.find(function(s){return s.name===name;}).id;
+  db.collection('checklist').doc(name+'_'+today).set({
+    name:name,studentId:studentId,date:today,snackGiven:give
+  },{merge:true})
+  .then(function(){showToast(give?'🍪 '+name+' 간식 지급 완료':'↩️ '+name+' 간식 지급을 취소했어요');})
+  .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
 
 // ===== Admin: Direct Presentation Edit =====

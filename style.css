@@ -1525,3 +1525,48 @@ body::after {
   line-height: 1.4;
   word-break: keep-all;
 }
+
+/* ===== Mission Snack (간식 안내) ===== */
+.mission-snack {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text-medium);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.mission-snack.ready {
+  background: linear-gradient(135deg, var(--sunflower-yellow), var(--petal-orange));
+  color: var(--white);
+  font-family: 'Jua', sans-serif;
+  font-size: 1.05rem;
+  box-shadow: var(--shadow-soft);
+  animation: popIn 0.5s ease;
+}
+
+.mission-snack.given {
+  background: #E8F5E9;
+  color: var(--leaf-green);
+  font-weight: 700;
+}
+
+.admin-snack-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--sunflower-yellow);
+  color: var(--text-dark);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-snack-btn.given {
+  background: #E8F5E9;
+  color: var(--leaf-green);
+}
