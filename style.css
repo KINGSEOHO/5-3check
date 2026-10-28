@@ -1720,3 +1720,42 @@ body::after {
 #tc-password:focus {
   border-color: var(--sunflower-yellow);
 }
+
+/* ===== Mission "함께한 친구" 선택 (선택 사항) ===== */
+.mission-with {
+  margin-top: -4px;
+  padding: 0 6px;
+}
+
+.mission-with label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-medium);
+  margin-bottom: 4px;
+}
+
+.mission-optional {
+  color: var(--text-light);
+  font-size: 0.78rem;
+}
+
+.mission-with select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+  outline: none;
+}
+
+.mission-with select:focus {
+  border-color: var(--sunflower-yellow);
+}
+
+.mission-with select:disabled {
+  background: #F5F5F5;
+  color: var(--text-light);
+}

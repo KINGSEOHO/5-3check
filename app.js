@@ -165,6 +165,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
+ 'mission-with-a','mission-with-select-a','mission-with-b','mission-with-select-b',
  'mission-confirm-btn','teacher-confirm-modal','tc-mission-list','tc-password','tc-error','tc-cancel','tc-confirm',
  'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
  'mission-hint','mission-snack','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
@@ -344,8 +345,20 @@ function listenHomeData(){
 }
 
 // ===== Student Page =====
+function buildMissionWithOptions(student){
+  ['A','B'].forEach(function(k){
+    var sel=el['missionWithSelect'+k];sel.innerHTML='';
+    var none=document.createElement('option');none.value='';none.textContent='(선택 안 함)';sel.appendChild(none);
+    STUDENTS.forEach(function(s){
+      if(s.id===student.id)return;
+      var o=document.createElement('option');o.value=s.name;o.textContent=s.name;sel.appendChild(o);
+    });
+  });
+}
+
 function openStudentPage(student){
   currentStudent=student;
+  buildMissionWithOptions(student);
   el.studentNameTitle.textContent=student.name;
   el.studentNumberBadge.textContent=student.id+'번';
   showPage('student');
@@ -424,6 +437,11 @@ function updateStudentUI(){
     el['missionStatus'+m[0]].className='card-status'+(m[2]?' done':'');
     el['missionCard'+m[0]].classList.toggle('checked',m[2]);
   });
+  [['A','mission1With',!!currentData.mission1],['B','mission2With',!!currentData.mission2]].forEach(function(m){
+    el['missionWith'+m[0]].style.display=m[2]?'block':'none';
+    el['missionWithSelect'+m[0]].value=currentData[m[1]]||'';
+    el['missionWithSelect'+m[0]].disabled=!!currentData.snackGiven;
+  });
   var mis=(currentData.mission1?1:0)+(currentData.mission2?1:0);
   if(mis===2&&currentData.snackGiven){el.missionSnack.textContent='🍪 오늘 간식을 받았어요! 내일도 도전해 봐요 💛';el.missionSnack.className='mission-snack given';}
   else if(mis===2){el.missionSnack.textContent='🎉 미션 2개 완료! 선생님께 오면 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack ready';}
@@ -448,6 +466,8 @@ function saveStudentData(){
     mission1:!!currentData.mission1,
     mission2:!!currentData.mission2,
     snackGiven:!!currentData.snackGiven,
+    mission1With:currentData.mission1With||'',
+    mission2With:currentData.mission2With||'',
     missionTexts:getTodayMissions(currentStudent).missions.map(function(m){return m.text;})
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
@@ -461,17 +481,20 @@ el.dutyCheck.addEventListener('change',function(){
   currentData.duty=el.dutyCheck.checked;saveStudentData();
   if(currentData.duty){showToast('🧹 1인 1역 완료! 멋져요! ✨');miniConfetti();}
 });
-function bindMissionCheck(input,field){
+function bindMissionCheck(input,field,withField){
   input.addEventListener('change',function(){
-    currentData[field]=input.checked;saveStudentData();
+    currentData[field]=input.checked;
+    if(!input.checked)currentData[withField]='';
+    saveStudentData();
     if(input.checked){showToast('🤝 미션 완료! 따뜻한 마음이 전해졌어요 💛');miniConfetti();}
   });
 }
 function openTeacherConfirm(){
   if(!currentStudent)return;
   el.tcMissionList.innerHTML='';
-  getTodayMissions(currentStudent).missions.forEach(function(m){
-    var li=document.createElement('li');li.textContent=m.icon+' '+m.text;el.tcMissionList.appendChild(li);
+  getTodayMissions(currentStudent).missions.forEach(function(m,i){
+    var w=currentData[i===0?'mission1With':'mission2With'];
+    var li=document.createElement('li');li.textContent=m.icon+' '+m.text+' — 함께한 친구: '+(w||'선택 안 함');el.tcMissionList.appendChild(li);
   });
   el.tcPassword.value='';el.tcError.classList.remove('show');
   el.teacherConfirmModal.classList.add('active');
@@ -498,8 +521,14 @@ el.tcConfirm.addEventListener('click',submitTeacherConfirm);
 el.tcPassword.addEventListener('keydown',function(e){if(e.key==='Enter')submitTeacherConfirm();});
 el.teacherConfirmModal.addEventListener('click',function(e){if(e.target===el.teacherConfirmModal)closeTeacherConfirm();});
 
-bindMissionCheck(el.missionCheckA,'mission1');
-bindMissionCheck(el.missionCheckB,'mission2');
+bindMissionCheck(el.missionCheckA,'mission1','mission1With');
+bindMissionCheck(el.missionCheckB,'mission2','mission2With');
+['A','B'].forEach(function(k,i){
+  var f=i===0?'mission1With':'mission2With';
+  el['missionWithSelect'+k].addEventListener('change',function(){
+    currentData[f]=el['missionWithSelect'+k].value;saveStudentData();
+  });
+});
 el.presentationPlus.addEventListener('click',function(){
   currentData.presentations=(currentData.presentations||0)+1;saveStudentData();
   showToast('🎤 발표 '+currentData.presentations+'회! 잘했어요!');
