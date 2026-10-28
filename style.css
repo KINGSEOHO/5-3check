@@ -1474,3 +1474,54 @@ body::after {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ===== 7-column stats row ===== */
+.stats-row-7 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ===== Today's Mission (오늘의 미션) ===== */
+.mission-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #FFF3E0, #FFFDE7);
+  border: 2px dashed var(--sunflower-gold);
+}
+
+.mission-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mission-title {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.25rem;
+  color: var(--text-dark);
+}
+
+.mission-sub {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--petal-orange);
+}
+
+.mission-hint {
+  font-size: 0.82rem;
+  color: var(--text-light);
+  margin-bottom: 2px;
+}
+
+.mission-card {
+  padding: 16px;
+}
+
+.mission-text {
+  font-size: 1.05rem;
+  line-height: 1.4;
+  word-break: keep-all;
+}

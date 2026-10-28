@@ -99,6 +99,37 @@
                 </button>
             </div>
 
+            <!-- 오늘의 미션 -->
+            <div class="mission-section">
+                <div class="mission-header">
+                    <span class="mission-title">🤝 오늘의 미션</span>
+                    <span class="mission-sub">하나 할 때마다 1점!</span>
+                </div>
+                <p class="mission-hint" id="mission-hint"></p>
+                <div class="checklist-card mission-card" id="mission-card-a">
+                    <div class="card-icon" id="mission-icon-a">👋</div>
+                    <div class="card-info">
+                        <span class="card-label mission-text" id="mission-text-a"></span>
+                        <span class="card-status" id="mission-status-a">미완료</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mission-check-a">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="checklist-card mission-card" id="mission-card-b">
+                    <div class="card-icon" id="mission-icon-b">🤝</div>
+                    <div class="card-info">
+                        <span class="card-label mission-text" id="mission-text-b"></span>
+                        <span class="card-status" id="mission-status-b">미완료</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mission-check-b">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- 오늘의 포인트 요약 -->
             <div class="points-summary" id="points-summary">
                 <div class="points-icon">⭐</div>
@@ -146,7 +177,7 @@
 
         <!-- ===== 탭1: 오늘 현황 ===== -->
         <div class="tab-content active" id="content-today">
-            <div class="stats-row stats-row-6">
+            <div class="stats-row stats-row-7">
                 <div class="stat-card">
                     <span class="stat-number" id="stat-homework">0</span>
                     <span class="stat-label">📚 숙제 완료</span>
@@ -171,6 +202,10 @@
                     <span class="stat-number" id="stat-custom">0</span>
                     <span class="stat-label">🎯 자유항목</span>
                 </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="stat-mission">0</span>
+                    <span class="stat-label">🤝 미션</span>
+                </div>
             </div>
 
             <div class="table-wrapper">
@@ -185,6 +220,7 @@
                             <th>💌 칭찬쪽지</th>
                             <th>⭐ 수업태도</th>
                             <th>🎯 자유항목</th>
+                            <th>🤝 미션</th>
                         </tr>
                     </thead>
                     <tbody id="today-table-body">
@@ -223,6 +259,7 @@
                             <th>💌 칭찬쪽지</th>
                             <th>⭐ 수업태도</th>
                             <th>🎯 자유항목</th>
+                            <th>🤝 미션</th>
                             <th>⭐ 총점</th>
                         </tr>
                     </thead>
@@ -281,7 +318,7 @@
             <!-- 조회 결과 요약 -->
             <div class="history-summary hidden" id="history-summary">
                 <div class="history-period" id="history-period-text"></div>
-                <div class="stats-row stats-row-6">
+                <div class="stats-row stats-row-7">
                     <div class="stat-card">
                         <span class="stat-number" id="hist-stat-homework">0</span>
                         <span class="stat-label">📚 숙제 완료</span>
@@ -306,6 +343,10 @@
                         <span class="stat-number" id="hist-stat-custom">0</span>
                         <span class="stat-label">🎯 자유항목</span>
                     </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="hist-stat-mission">0</span>
+                        <span class="stat-label">🤝 미션</span>
+                    </div>
                 </div>
             </div>
 
@@ -322,6 +363,7 @@
                             <th>💌 칭찬쪽지</th>
                             <th>⭐ 수업태도</th>
                             <th>🎯 자유항목</th>
+                            <th>🤝 미션</th>
                             <th>⭐ 총점</th>
                         </tr>
                     </thead>

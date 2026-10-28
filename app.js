@@ -20,6 +20,72 @@ var STUDENTS = [
 ];
 var ADMIN_PASSWORD = "9494";
 
+// ===== 오늘의 미션 =====
+// 하루에 2개(마음 표현 1 + 함께하기 1)를 날짜 기준으로 순환해서 보여주고, 하나 완료할 때마다 1점.
+var MISSION_POOL_A = [
+  {icon:"👋",text:"친구에게 밝게 인사하기"},
+  {icon:"😊",text:"친구와 눈이 마주치면 활짝 웃어주기"},
+  {icon:"🍚",text:"친구에게 오늘 점심 어땠냐고 물어보기"},
+  {icon:"🙏",text:"친구에게 \"고마워\"라고 말하거나 쪽지로 전하기"},
+  {icon:"🌟",text:"친구의 좋은 점 하나 찾아서 알려주기"},
+  {icon:"👍",text:"친구에게 엄지척 해주기"},
+  {icon:"💌",text:"친구에게 응원 쪽지 써서 전하기"},
+  {icon:"👂",text:"친구가 이야기할 때 끝까지 들어주기"},
+  {icon:"🎨",text:"친구에게 좋아하는 색깔이나 놀이 물어보기"},
+  {icon:"👏",text:"친구가 잘한 일에 박수쳐 주기"},
+  {icon:"🌈",text:"오늘 기분이 어떤지 친구에게 물어보기"},
+  {icon:"🤗",text:"친구에게 \"잘했어!\" 응원해 주기"}
+];
+var MISSION_POOL_B = [
+  {icon:"✏️",text:"친구가 떨어뜨린 물건 주워주기"},
+  {icon:"🤝",text:"도움이 필요한 친구에게 \"도와줄까?\" 물어보기"},
+  {icon:"🧸",text:"쉬는 시간에 혼자 있는 친구에게 같이 놀자고 하기"},
+  {icon:"📏",text:"친구에게 준비물 빌려주기"},
+  {icon:"🙌",text:"친구가 발표할 때 집중해서 들어주기"},
+  {icon:"🚶",text:"줄을 설 때 친구에게 양보하기"},
+  {icon:"🧹",text:"친구와 함께 교실 정리하기"},
+  {icon:"💬",text:"모둠 활동에서 친구 의견 먼저 들어주기"},
+  {icon:"⚽",text:"친구에게 같이 하고 싶은 놀이 제안하기"},
+  {icon:"💛",text:"친구가 실수했을 때 \"괜찮아\" 하고 다독여주기"},
+  {icon:"📖",text:"짝에게 오늘 배운 것 알려주기"},
+  {icon:"🏷️",text:"친구 이름을 불러주며 인사하기"},
+  {icon:"🪑",text:"친구와 나란히 앉거나 함께 걷기"},
+  {icon:"🎁",text:"친구에게 작은 칭찬 한 가지 해주기"}
+];
+// 쉬운 단계: 부담 없는 행동 1개 + 한 마디 말하기 1개 (말하기 미션이 매일 반드시 포함됨)
+var MISSION_POOL_BASIC_A = [
+  {icon:"👋",text:"친구에게 손 흔들며 인사하기"},
+  {icon:"😊",text:"친구에게 활짝 웃어주기"},
+  {icon:"👍",text:"친구에게 엄지척 해주기"},
+  {icon:"🙂",text:"친구와 눈을 마주치고 고개 끄덕이기"},
+  {icon:"💌",text:"친구에게 짧은 쪽지나 그림 전하기"},
+  {icon:"👏",text:"친구가 발표할 때 박수쳐 주기"},
+  {icon:"🤝",text:"친구와 함께 놀이하거나 나란히 앉기"},
+  {icon:"✏️",text:"친구가 떨어뜨린 물건 주워주기"}
+];
+var MISSION_POOL_BASIC_B = [
+  {icon:"🗣️",text:"친구에게 \"안녕\" 한 마디 하기"},
+  {icon:"🙇",text:"선생님께 \"안녕하세요\" 인사하기"},
+  {icon:"🙏",text:"친구에게 \"고마워\" 한 마디 하기"},
+  {icon:"📣",text:"친구 이름을 한 번 불러보기"},
+  {icon:"🏠",text:"친구에게 \"잘 가\" 인사하기"},
+  {icon:"✅",text:"질문을 받으면 \"네\" 또는 \"아니요\"로 대답하기"},
+  {icon:"😄",text:"친구에게 \"좋아\" 한 마디 해주기"},
+  {icon:"🌼",text:"친구에게 \"같이 하자\" 말해보기"}
+];
+var BASIC_MISSION_STUDENT_IDS = [21];
+var MISSION_HINT_DEFAULT = "말이 어려우면 손짓, 웃음, 쪽지로 전해도 좋아요 😊";
+var MISSION_HINT_BASIC = "작은 목소리로 한 마디면 충분해요 🌱";
+function getDayNumber(){
+  var n=new Date(); return Math.floor(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())/86400000);
+}
+function getTodayMissions(student){
+  var day=getDayNumber();
+  var basic=!!student && BASIC_MISSION_STUDENT_IDS.indexOf(student.id)!==-1;
+  var a=basic?MISSION_POOL_BASIC_A:MISSION_POOL_A, b=basic?MISSION_POOL_BASIC_B:MISSION_POOL_B;
+  return {missions:[a[day%a.length], b[(day*3+1)%b.length]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+}
+
 // ===== Utilities =====
 function getTodayString() {
   var n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,'0')+"-"+String(n.getDate()).padStart(2,'0');
@@ -62,6 +128,8 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
+ 'mission-hint','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
+ 'mission-card-b','mission-icon-b','mission-text-b','mission-status-b','mission-check-b','stat-mission','hist-stat-mission',
  'reset-date-input', 'cumulative-points', 'cumulative-rank', 'cumulative-label', 'pins-table-body'
 ].forEach(function(id){
   var camel=id.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();});
@@ -261,7 +329,7 @@ function startCumulativeListener(student) {
   
   unsubscribeCumulative = query.onSnapshot(function(snap){
     var map={};
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
     
     snap.forEach(function(doc){
       var d=doc.data();
@@ -273,12 +341,13 @@ function startCumulativeListener(student) {
       map[d.name].praise+=(d.praise||0);
       map[d.name].att+=(d.attitude||0);
       map[d.name].cust+=(d.customScore||0);
+      map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
     });
     
     var arr=[];
     Object.keys(map).forEach(function(name){
       var s=map[name]; var bonus=Math.floor(s.pr/3);
-      arr.push({id:s.id,name:name,total:s.hw+s.du+bonus+s.praise+s.att+s.cust});
+      arr.push({id:s.id,name:name,total:s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi});
     });
     arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
     
@@ -327,8 +396,19 @@ function updateStudentUI(){
   var praise=currentData.praise||0;
   var att=currentData.attitude||0;
   var cust=currentData.customScore||0;
-  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;
-  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+')':'');
+  var tm=getTodayMissions(currentStudent);
+  el.missionHint.textContent=tm.hint;
+  [['A',tm.missions[0],!!currentData.mission1],['B',tm.missions[1],!!currentData.mission2]].forEach(function(m){
+    el['missionIcon'+m[0]].textContent=m[1].icon;
+    el['missionText'+m[0]].textContent=m[1].text;
+    el['missionCheck'+m[0]].checked=m[2];
+    el['missionStatus'+m[0]].textContent=m[2]?'완료! 👍':'미완료';
+    el['missionStatus'+m[0]].className='card-status'+(m[2]?' done':'');
+    el['missionCard'+m[0]].classList.toggle('checked',m[2]);
+  });
+  var mis=(currentData.mission1?1:0)+(currentData.mission2?1:0);
+  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;
+  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+')':'');
 }
 
 function saveStudentData(){
@@ -340,7 +420,10 @@ function saveStudentData(){
     praise:currentData.praise||0,
     attitude:currentData.attitude||0,
     customScore:currentData.customScore||0,
-    customLogs:currentData.customLogs||[]
+    customLogs:currentData.customLogs||[],
+    mission1:!!currentData.mission1,
+    mission2:!!currentData.mission2,
+    missionTexts:getTodayMissions(currentStudent).missions.map(function(m){return m.text;})
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
 
@@ -353,6 +436,14 @@ el.dutyCheck.addEventListener('change',function(){
   currentData.duty=el.dutyCheck.checked;saveStudentData();
   if(currentData.duty){showToast('🧹 1인 1역 완료! 멋져요! ✨');miniConfetti();}
 });
+function bindMissionCheck(input,field){
+  input.addEventListener('change',function(){
+    currentData[field]=input.checked;saveStudentData();
+    if(input.checked){showToast('🤝 미션 완료! 따뜻한 마음이 전해졌어요 💛');miniConfetti();}
+  });
+}
+bindMissionCheck(el.missionCheckA,'mission1');
+bindMissionCheck(el.missionCheckB,'mission2');
 el.presentationPlus.addEventListener('click',function(){
   currentData.presentations=(currentData.presentations||0)+1;saveStudentData();
   showToast('🎤 발표 '+currentData.presentations+'회! 잘했어요!');
@@ -441,16 +532,17 @@ function loadTodayStatus(){
       var map={};
       snap.forEach(function(doc){ map[doc.data().name] = doc.data(); });
       
-      var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0,rows=[];
+      var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0,tMi=0,rows=[];
       STUDENTS.forEach(function(s){
         var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
         if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
-        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0});
+        var mi=(d.mission1?1:0)+(d.mission2?1:0);tMi+=mi;
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi});
       });
       
       rows.sort(function(a,b){return a.id-b.id;});
       el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
-      el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;
+      el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;el.statMission.textContent=tMi;
       el.todayTableBody.innerHTML=rows.map(function(r){
         return '<tr><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
           '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
@@ -470,7 +562,8 @@ function loadTodayStatus(){
             '<span class="admin-attitude-val">'+r.attitude+'</span>'+
             '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
           '</div></td>'+
-          '<td><strong>'+r.customScore+'</strong></td></tr>';
+          '<td><strong>'+r.customScore+'</strong></td>'+
+          '<td><strong>'+r.mission+'</strong></td></tr>';
       }).join('');
       resolve();
     }, reject);
@@ -484,7 +577,7 @@ function loadCumulativePoints(){
     
     adminUnsubscribes.points = db.collection('checklist').onSnapshot(function(snap){
       var map={};
-      STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
+      STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
       snap.forEach(function(doc){
         var d=doc.data();
         if(!d.name||!map[d.name])return;
@@ -496,6 +589,7 @@ function loadCumulativePoints(){
         map[d.name].praise+=(d.praise||0);
         map[d.name].att+=(d.attitude||0);
         map[d.name].cust+=(d.customScore||0);
+      map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
       });
       renderPointsTable(map,el.pointsTableBody);
       resolve();
@@ -508,7 +602,7 @@ function renderPointsTable(map,tbody){
   var arr=[];
   Object.keys(map).forEach(function(name){
     var s=map[name]; var bonus=Math.floor(s.pr/3);
-    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,att:s.att,cust:s.cust,total:s.hw+s.du+bonus+s.praise+s.att+s.cust});
+    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,att:s.att,cust:s.cust,mi:s.mi,total:s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi});
   });
   arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
   tbody.innerHTML=arr.map(function(r,i){
@@ -521,6 +615,7 @@ function renderPointsTable(map,tbody){
       '<td>'+r.praise+'점</td>'+
       '<td>'+r.att+'점</td>'+
       '<td>'+r.cust+'점</td>'+
+      '<td>'+r.mi+'점</td>'+
       '<td><span class="total-points">'+r.total+'</span></td></tr>';
   }).join('');
 }
@@ -661,8 +756,8 @@ function getDateRange(){
 
 function loadHistoryData(startDate,endDate,label){
   return db.collection('checklist').get().then(function(snap){
-    var map={};var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0;
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0};});
+    var map={};var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0,tMi=0;
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name]||!d.date)return;
@@ -673,12 +768,13 @@ function loadHistoryData(startDate,endDate,label){
         var pr=d.praise||0;map[d.name].praise+=pr;tPraise+=pr;
         var at=d.attitude||0;map[d.name].att+=at;tAtt+=at;
         var cu=d.customScore||0;map[d.name].cust+=cu;tCust+=cu;
+        var mm=(d.mission1?1:0)+(d.mission2?1:0);map[d.name].mi+=mm;tMi+=mm;
       }
     });
     // Show results
     el.historyPeriodText.textContent='📅 '+label;
     el.histStatHomework.textContent=tHw;el.histStatDuty.textContent=tDu;el.histStatPresentation.textContent=tPr;el.histStatPraise.textContent=tPraise;
-    el.histStatAttitude.textContent=tAtt;el.histStatCustom.textContent=tCust;
+    el.histStatAttitude.textContent=tAtt;el.histStatCustom.textContent=tCust;el.histStatMission.textContent=tMi;
     el.historySummary.classList.remove('hidden');
     el.historyTableWrapper.style.display='block';
     el.historyEmpty.style.display='none';
