@@ -97,8 +97,35 @@ function missionStride(len){
   return s;
 }
 
+// ===== 연속 보너스 =====
+// 미션 2개를 모두 완료한 수업일이 연속으로 STREAK_BONUS_EVERY일 쌓일 때마다(3, 6, 9일째...) 보너스 점수.
+// 주말과 관리자가 지정한 쉬는 날은 건너뛰어서 이어 계산한다. (본인 기록 myMissionDays 기준)
+var STREAK_BONUS_EVERY = 3;
+var STREAK_BONUS_POINTS = 1;
+var myMissionDays = {}; // {날짜: 그날 미션 2개를 모두 완료했는지}
+function isSchoolDay(s){
+  var w=new Date(s+'T00:00:00').getDay();
+  return w!==0&&w!==6&&missionConfig.holidays.indexOf(s)===-1;
+}
+function prevSchoolDay(s){
+  var d=new Date(s+'T00:00:00');
+  for(var i=0;i<400;i++){d.setDate(d.getDate()-1);var t=dateToStr(d);if(isSchoolDay(t))return t;}
+  return null;
+}
+function countPrevStreak(from){
+  var n=0,cur=from;
+  for(;;){var p=prevSchoolDay(cur);if(!p||!myMissionDays[p])break;n++;cur=p;}
+  return n;
+}
+function computeMissionStreak(){
+  var done=!!(currentData.mission1&&currentData.mission2);
+  var before=countPrevStreak(getTodayString());
+  var n=done?before+1:0;
+  return {before:before,n:n,bonus:(n>0&&n%STREAK_BONUS_EVERY===0)?STREAK_BONUS_POINTS:0};
+}
+
 // 관리자 '미션 관리' 탭에서 저장한 목록 (Firestore settings/missions). 없거나 읽기 실패하면 위 기본 목록 사용.
-var DEFAULT_MISSION_CONFIG = {poolA:MISSION_POOL_A,poolB:MISSION_POOL_B,basicA:MISSION_POOL_BASIC_A,basicB:MISSION_POOL_BASIC_B,basicIds:BASIC_MISSION_STUDENT_IDS};
+var DEFAULT_MISSION_CONFIG = {poolA:MISSION_POOL_A,poolB:MISSION_POOL_B,basicA:MISSION_POOL_BASIC_A,basicB:MISSION_POOL_BASIC_B,basicIds:BASIC_MISSION_STUDENT_IDS,holidays:[]};
 var MISSION_LIST_KEYS = ['poolA','poolB','basicA','basicB'];
 function cloneMissionConfig(c){return JSON.parse(JSON.stringify(c));}
 function normalizeMissionConfig(raw){
@@ -112,6 +139,9 @@ function normalizeMissionConfig(raw){
   });
   if(Array.isArray(raw.basicIds)){
     cfg.basicIds=raw.basicIds.filter(function(n){return Number.isInteger(n)&&n>=1&&n<=STUDENTS.length;});
+  }
+  if(Array.isArray(raw.holidays)){
+    cfg.holidays=raw.holidays.filter(function(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);});
   }
   return cfg;
 }
@@ -166,6 +196,7 @@ var el={};
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
  'mission-with-a','mission-with-select-a','mission-with-b','mission-with-select-b',
+ 'mission-streak','mission-holidays',
  'mission-confirm-btn','teacher-confirm-modal','tc-mission-list','tc-password','tc-error','tc-cancel','tc-confirm',
  'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
  'mission-hint','mission-snack','mission-card-a','mission-icon-a','mission-text-a','mission-status-a','mission-check-a',
@@ -359,6 +390,7 @@ function buildMissionWithOptions(student){
 function openStudentPage(student){
   currentStudent=student;
   buildMissionWithOptions(student);
+  myMissionDays={};
   el.studentNameTitle.textContent=student.name;
   el.studentNumberBadge.textContent=student.id+'번';
   showPage('student');
@@ -380,12 +412,14 @@ function startCumulativeListener(student) {
   var query = db.collection('checklist').where('name', '==', student.name);
   
   unsubscribeCumulative = query.onSnapshot(function(snap){
+    var md={};
     var map={};
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0,sb:0};});
     
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name])return;
+      if(d.date)md[d.date]=!!(d.mission1&&d.mission2);
       if(d.date && d.date < startOfCurrentMonth)return;
       if(d.homework)map[d.name].hw++;
       if(d.duty)map[d.name].du++;
@@ -394,11 +428,14 @@ function startCumulativeListener(student) {
       map[d.name].att+=(d.attitude||0);
       map[d.name].cust+=(d.customScore||0);
       map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
+      map[d.name].sb+=(d.streakBonus||0);
     });
     
     var s=map[student.name]; var bonus=Math.floor(s.pr/3);
-    var myTotal=s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi;
+    var myTotal=s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi+s.sb;
     el.cumulativePoints.textContent = myTotal + '점';
+    myMissionDays=md;
+    if(currentStudent===student)updateStudentUI();
   }, function(err){
     console.error("Cumulative listener error:", err);
   });
@@ -449,12 +486,18 @@ function updateStudentUI(){
   el.missionConfirmBtn.style.display=(mis===2&&!currentData.snackGiven)?'block':'none';
   // 선생님이 확인한 뒤에는 미션 체크를 바꿀 수 없게 잠금 (관리자 화면에서 지급 취소하면 다시 풀림)
   el.missionCheckA.disabled=el.missionCheckB.disabled=!!currentData.snackGiven;
-  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;
-  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+')':'');
+  var st=computeMissionStreak(),E=STREAK_BONUS_EVERY,streakMsg;
+  if(st.n>0){streakMsg='🔥 미션 2개 '+st.n+'일 연속 달성!'+(st.bonus?' 🎁 보너스 +'+st.bonus+'점':' ('+(E-st.n%E)+'일 더 이어가면 보너스 🎁)');}
+  else if(st.before>0){var nx=st.before+1;streakMsg='🔥 지금 '+st.before+'일 연속! 오늘도 2개 하면 '+nx+'일째'+(nx%E===0?' 🎁 보너스 점수!':'');}
+  else{streakMsg='미션 2개를 연속으로 하면 '+E+'일째마다 보너스 '+STREAK_BONUS_POINTS+'점! 🎁';}
+  el.missionStreak.textContent=streakMsg;
+  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;var sbn=currentData.streakBonus||0;pts+=sbn;
+  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+(sbn!==0?'연속보너스 '+sbn+'점 ':'')+')':'');
 }
 
 function saveStudentData(){
   if(!currentStudent)return;
+  var st=computeMissionStreak();
   db.collection('checklist').doc(getDocId(currentStudent.name)).set({
     name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),
     homework:currentData.homework||false,duty:currentData.duty||false,
@@ -468,6 +511,8 @@ function saveStudentData(){
     snackGiven:!!currentData.snackGiven,
     mission1With:currentData.mission1With||'',
     mission2With:currentData.mission2With||'',
+    missionStreak:st.n,
+    streakBonus:st.bonus,
     missionTexts:getTodayMissions(currentStudent).missions.map(function(m){return m.text;})
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
@@ -623,7 +668,7 @@ function loadTodayStatus(){
         var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
         if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
         var mi=(d.mission1?1:0)+(d.mission2?1:0);tMi+=mi;
-        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,snack:!!d.snackGiven});
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,snack:!!d.snackGiven,streak:d.missionStreak||0,sbonus:d.streakBonus||0});
       });
       
       rows.sort(function(a,b){return a.id-b.id;});
@@ -649,7 +694,7 @@ function loadTodayStatus(){
             '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
           '</div></td>'+
           '<td><strong>'+r.customScore+'</strong></td>'+
-          '<td><strong>'+r.mission+'</strong></td>'+
+          '<td><strong>'+r.mission+'</strong>'+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
           '<td>'+(r.mission>=2?'<button class="admin-snack-btn'+(r.snack?' given':'')+'" data-name="'+r.name+'" data-given="'+(r.snack?1:0)+'">'+(r.snack?'✔ 지급됨':'🍪 주기')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
       }).join('');
       resolve();
@@ -664,7 +709,7 @@ function loadCumulativePoints(){
     
     adminUnsubscribes.points = db.collection('checklist').onSnapshot(function(snap){
       var map={};
-      STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
+      STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0,sb:0};});
       snap.forEach(function(doc){
         var d=doc.data();
         if(!d.name||!map[d.name])return;
@@ -677,6 +722,7 @@ function loadCumulativePoints(){
         map[d.name].att+=(d.attitude||0);
         map[d.name].cust+=(d.customScore||0);
       map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
+      map[d.name].sb+=(d.streakBonus||0);
       });
       renderPointsTable(map,el.pointsTableBody);
       resolve();
@@ -689,7 +735,7 @@ function renderPointsTable(map,tbody){
   var arr=[];
   Object.keys(map).forEach(function(name){
     var s=map[name]; var bonus=Math.floor(s.pr/3);
-    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,att:s.att,cust:s.cust,mi:s.mi,total:s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi});
+    arr.push({id:s.id,name:name,hw:s.hw,du:s.du,pr:s.pr,bonus:bonus,praise:s.praise,att:s.att,cust:s.cust,mi:s.mi,sb:s.sb,total:s.hw+s.du+bonus+s.praise+s.att+s.cust+s.mi+s.sb});
   });
   arr.sort(function(a,b){return b.total!==a.total?b.total-a.total:a.id-b.id;});
   tbody.innerHTML=arr.map(function(r,i){
@@ -702,7 +748,7 @@ function renderPointsTable(map,tbody){
       '<td>'+r.praise+'점</td>'+
       '<td>'+r.att+'점</td>'+
       '<td>'+r.cust+'점</td>'+
-      '<td>'+r.mi+'점</td>'+
+      '<td>'+(r.mi+r.sb)+'점'+(r.sb?' <small style="color:#999">(🔥연속 +'+r.sb+')</small>':'')+'</td>'+
       '<td><span class="total-points">'+r.total+'</span></td></tr>';
   }).join('');
 }
@@ -859,7 +905,7 @@ function getDateRange(){
 function loadHistoryData(startDate,endDate,label){
   return db.collection('checklist').get().then(function(snap){
     var map={};var tHw=0,tDu=0,tPr=0,tPraise=0,tAtt=0,tCust=0,tMi=0;
-    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0};});
+    STUDENTS.forEach(function(s){map[s.name]={id:s.id,name:s.name,hw:0,du:0,pr:0,praise:0,att:0,cust:0,mi:0,sb:0};});
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name]||!d.date)return;
@@ -870,7 +916,7 @@ function loadHistoryData(startDate,endDate,label){
         var pr=d.praise||0;map[d.name].praise+=pr;tPraise+=pr;
         var at=d.attitude||0;map[d.name].att+=at;tAtt+=at;
         var cu=d.customScore||0;map[d.name].cust+=cu;tCust+=cu;
-        var mm=(d.mission1?1:0)+(d.mission2?1:0);map[d.name].mi+=mm;tMi+=mm;
+        var mm=(d.mission1?1:0)+(d.mission2?1:0);map[d.name].mi+=mm;tMi+=mm;map[d.name].sb+=(d.streakBonus||0);
       }
     });
     // Show results
@@ -1113,15 +1159,21 @@ function renderMissionEditor(){
   });
   el.missionBasicIds.value=missionDraft.basicIds.join(', ');
   updateMissionBasicNames();
+  el.missionHolidays.value=(missionDraft.holidays||[]).join(', ');
 }
 
 el.missionBasicIds.addEventListener('input',function(){
   missionDraft.basicIds=parseStudentIds(el.missionBasicIds.value);updateMissionBasicNames();
 });
 
+el.missionHolidays.addEventListener('input',function(){
+  var found=el.missionHolidays.value.match(/\d{4}-\d{2}-\d{2}/g)||[];
+  missionDraft.holidays=found.filter(function(s,i){return found.indexOf(s)===i;}).sort();
+});
+
 el.missionResetDefault.addEventListener('click',function(){
   if(!confirm('기본 미션 목록으로 되돌릴까요?\n(저장을 눌러야 실제로 적용돼요)'))return;
-  missionDraft=cloneMissionConfig(DEFAULT_MISSION_CONFIG);renderMissionEditor();
+  var hol=missionDraft.holidays||[];missionDraft=cloneMissionConfig(DEFAULT_MISSION_CONFIG);missionDraft.holidays=hol;renderMissionEditor();
   showToast('↩️ 기본 목록을 불러왔어요. 저장을 눌러야 적용돼요');
 });
 

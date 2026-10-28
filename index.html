@@ -136,6 +136,7 @@
                     <label for="mission-with-select-b">어떤 친구와 했나요? <span class="mission-optional">(선택 사항이에요)</span></label>
                     <select id="mission-with-select-b"></select>
                 </div>
+                <p class="mission-streak" id="mission-streak"></p>
                 <p class="mission-snack" id="mission-snack"></p>
                 <button class="mission-confirm-btn" id="mission-confirm-btn" style="display:none;">👩‍🏫 선생님 확인</button>
             </div>
@@ -421,6 +422,11 @@
                     <p class="mission-edit-desc">학생 번호를 쉼표로 구분해서 적어주세요. (예: 21)</p>
                     <input type="text" id="mission-basic-ids" class="mission-edit-ids" inputmode="numeric" autocomplete="off">
                     <p class="mission-edit-names" id="mission-basic-names"></p>
+                </div>
+                <div class="mission-edit-section">
+                    <h4>쉬는 날 (연속 계산에서 제외)</h4>
+                    <p class="mission-edit-desc">미션 2개를 연속으로 한 날을 셀 때, 주말은 자동으로 건너뛰어요. 공휴일·방학·재량휴업일처럼 학교에 오지 않는 날짜를 쉼표로 적어주세요. (예: 2026-11-03, 2026-12-25)</p>
+                    <input type="text" id="mission-holidays" class="mission-edit-ids" autocomplete="off" placeholder="2026-12-25, 2027-01-01">
                 </div>
                 <div class="mission-manage-actions">
                     <button class="modal-cancel" id="mission-reset-default">기본값으로 되돌리기</button>
