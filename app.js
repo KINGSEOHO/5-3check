@@ -117,6 +117,10 @@ function countPrevStreak(from){
   for(;;){var p=prevSchoolDay(cur);if(!p||!myMissionDays[p])break;n++;cur=p;}
   return n;
 }
+// 미션 점수는 선생님이 확인한 뒤에만 올라간다. (missionConfirmed, 예전 기록은 snackGiven 도 확인으로 인정)
+function isMissionConfirmed(d){return !!(d&&(d.missionConfirmed||d.snackGiven));}
+function missionPoints(d){return isMissionConfirmed(d)?((d.mission1?1:0)+(d.mission2?1:0)):0;}
+function streakPoints(d){return isMissionConfirmed(d)?(d.streakBonus||0):0;}
 function computeMissionStreak(){
   var done=!!(currentData.mission1&&currentData.mission2);
   var before=countPrevStreak(getTodayString());
@@ -419,7 +423,7 @@ function startCumulativeListener(student) {
     snap.forEach(function(doc){
       var d=doc.data();
       if(!d.name||!map[d.name])return;
-      if(d.date)md[d.date]=!!(d.mission1&&d.mission2);
+      if(d.date)md[d.date]=!!(d.mission1&&d.mission2&&isMissionConfirmed(d));
       if(d.date && d.date < startOfCurrentMonth)return;
       if(d.homework)map[d.name].hw++;
       if(d.duty)map[d.name].du++;
@@ -427,8 +431,8 @@ function startCumulativeListener(student) {
       map[d.name].praise+=(d.praise||0);
       map[d.name].att+=(d.attitude||0);
       map[d.name].cust+=(d.customScore||0);
-      map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
-      map[d.name].sb+=(d.streakBonus||0);
+      map[d.name].mi+=missionPoints(d);
+      map[d.name].sb+=streakPoints(d);
     });
     
     var s=map[student.name]; var bonus=Math.floor(s.pr/3);
@@ -477,22 +481,27 @@ function updateStudentUI(){
   [['A','mission1With',!!currentData.mission1],['B','mission2With',!!currentData.mission2]].forEach(function(m){
     el['missionWith'+m[0]].style.display=m[2]?'block':'none';
     el['missionWithSelect'+m[0]].value=currentData[m[1]]||'';
-    el['missionWithSelect'+m[0]].disabled=!!currentData.snackGiven;
+    el['missionWithSelect'+m[0]].disabled=isMissionConfirmed(currentData);
   });
   var mis=(currentData.mission1?1:0)+(currentData.mission2?1:0);
-  if(mis===2&&currentData.snackGiven){el.missionSnack.textContent='🍪 오늘 간식을 받았어요! 내일도 도전해 봐요 💛';el.missionSnack.className='mission-snack given';}
-  else if(mis===2){el.missionSnack.textContent='🎉 미션 2개 완료! 선생님께 오면 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack ready';}
-  else{el.missionSnack.textContent='미션 2개를 모두 하면 선생님께 와서 간식을 받을 수 있어요 🍪';el.missionSnack.className='mission-snack';}
-  el.missionConfirmBtn.style.display=(mis===2&&!currentData.snackGiven)?'block':'none';
-  // 선생님이 확인한 뒤에는 미션 체크를 바꿀 수 없게 잠금 (관리자 화면에서 지급 취소하면 다시 풀림)
-  el.missionCheckA.disabled=el.missionCheckB.disabled=!!currentData.snackGiven;
+  var conf=isMissionConfirmed(currentData);
+  var misPts=conf?mis:0;
+  var snackMsg,snackCls='mission-snack';
+  if(conf){snackMsg=mis===2?'🍪 선생님 확인 완료! 점수가 올랐고 간식도 받아요 💛':'✅ 선생님 확인 완료! 미션 '+mis+'점이 올랐어요 💛';snackCls+=' given';}
+  else if(mis===2){snackMsg='🎉 미션 2개 완료! 선생님께 확인받으면 점수가 올라가고 간식도 받을 수 있어요 🍪';snackCls+=' ready';}
+  else if(mis===1){snackMsg='미션 1개 완료! 선생님께 확인받으면 점수가 올라가요. 2개를 모두 하면 간식도 받아요 🍪';}
+  else{snackMsg='미션을 하고 선생님께 확인받으면 점수가 올라가요! 2개를 모두 하면 간식도 받아요 🍪';}
+  el.missionSnack.textContent=snackMsg;el.missionSnack.className=snackCls;
+  el.missionConfirmBtn.style.display=(mis>=1&&!conf)?'block':'none';
+  // 선생님이 확인한 뒤에는 미션 체크를 바꿀 수 없게 잠금 (관리자 화면에서 확인을 취소하면 다시 풀림)
+  el.missionCheckA.disabled=el.missionCheckB.disabled=conf;
   var st=computeMissionStreak(),E=STREAK_BONUS_EVERY,streakMsg;
-  if(st.n>0){streakMsg='🔥 미션 2개 '+st.n+'일 연속 달성!'+(st.bonus?' 🎁 보너스 +'+st.bonus+'점':' ('+(E-st.n%E)+'일 더 이어가면 보너스 🎁)');}
+  if(st.n>0){streakMsg='🔥 미션 2개 '+st.n+'일 연속 달성!'+(st.bonus?(conf?' 🎁 보너스 +'+st.bonus+'점':' 🎁 선생님 확인 후 보너스 +'+st.bonus+'점'):' ('+(E-st.n%E)+'일 더 이어가면 보너스 🎁)');}
   else if(st.before>0){var nx=st.before+1;streakMsg='🔥 지금 '+st.before+'일 연속! 오늘도 2개 하면 '+nx+'일째'+(nx%E===0?' 🎁 보너스 점수!':'');}
   else{streakMsg='미션 2개를 연속으로 하면 '+E+'일째마다 보너스 '+STREAK_BONUS_POINTS+'점! 🎁';}
   el.missionStreak.textContent=streakMsg;
-  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=mis;var sbn=currentData.streakBonus||0;pts+=sbn;
-  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(mis!==0?'미션 '+mis+'점 ':'')+(sbn!==0?'연속보너스 '+sbn+'점 ':'')+')':'');
+  var pts=0;if(currentData.homework)pts++;if(currentData.duty)pts++;pts+=bonus;pts+=praise;pts+=att;pts+=cust;pts+=misPts;var sbn=conf?(currentData.streakBonus||0):0;pts+=sbn;
+  el.todayPoints.textContent=pts+'점'+(pts!==0?' ('+(bonus>0?'발표보너스 '+bonus+'점 ':'')+(praise!==0?'칭찬 '+praise+'점 ':'')+(att!==0?'태도 '+att+'점 ':'')+(cust!==0?'자유 '+cust+'점 ':'')+(misPts!==0?'미션 '+misPts+'점 ':'')+(sbn!==0?'연속보너스 '+sbn+'점 ':'')+')':'')+(mis>0&&!conf?' · 미션 '+mis+'점은 선생님 확인 후 반영돼요':'');
 }
 
 function saveStudentData(){
@@ -509,6 +518,7 @@ function saveStudentData(){
     mission1:!!currentData.mission1,
     mission2:!!currentData.mission2,
     snackGiven:!!currentData.snackGiven,
+    missionConfirmed:!!currentData.missionConfirmed,
     mission1With:currentData.mission1With||'',
     mission2With:currentData.mission2With||'',
     missionStreak:st.n,
@@ -539,7 +549,7 @@ function openTeacherConfirm(){
   el.tcMissionList.innerHTML='';
   getTodayMissions(currentStudent).missions.forEach(function(m,i){
     var w=currentData[i===0?'mission1With':'mission2With'];
-    var li=document.createElement('li');li.textContent=m.icon+' '+m.text+' — 함께한 친구: '+(w||'선택 안 함');el.tcMissionList.appendChild(li);
+    var li=document.createElement('li');li.textContent=(currentData[i===0?'mission1':'mission2']?'✅ ':'⬜ ')+m.icon+' '+m.text+' — 함께한 친구: '+(w||'선택 안 함');el.tcMissionList.appendChild(li);
   });
   el.tcPassword.value='';el.tcError.classList.remove('show');
   el.teacherConfirmModal.classList.add('active');
@@ -553,11 +563,13 @@ function submitTeacherConfirm(){
     setTimeout(function(){el.tcPassword.style.animation='';},500);
     return;
   }
-  if(!currentStudent||!currentData.mission1||!currentData.mission2){closeTeacherConfirm();return;}
+  if(!currentStudent||(!currentData.mission1&&!currentData.mission2)){closeTeacherConfirm();return;}
+  var both=!!(currentData.mission1&&currentData.mission2),st=computeMissionStreak();
   db.collection('checklist').doc(getDocId(currentStudent.name)).set({
-    name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),snackGiven:true
+    name:currentStudent.name,studentId:currentStudent.id,date:getTodayString(),
+    missionConfirmed:true,snackGiven:both,missionStreak:st.n,streakBonus:st.bonus
   },{merge:true})
-  .then(function(){closeTeacherConfirm();showToast('🍪 선생님 확인 완료! 간식을 받아가세요');miniConfetti();})
+  .then(function(){closeTeacherConfirm();showToast(both?'🍪 선생님 확인 완료! 점수가 올랐어요. 간식을 받아가세요':'✅ 선생님 확인 완료! 미션 점수가 올랐어요');miniConfetti();})
   .catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
 el.missionConfirmBtn.addEventListener('click',openTeacherConfirm);
@@ -667,8 +679,8 @@ function loadTodayStatus(){
       STUDENTS.forEach(function(s){
         var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
         if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
-        var mi=(d.mission1?1:0)+(d.mission2?1:0);tMi+=mi;
-        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,snack:!!d.snackGiven,streak:d.missionStreak||0,sbonus:d.streakBonus||0});
+        var raw=(d.mission1?1:0)+(d.mission2?1:0),cf=isMissionConfirmed(d),mi=cf?raw:0;tMi+=mi;
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,raw:raw,confirmed:cf,streak:d.missionStreak||0,sbonus:streakPoints(d)});
       });
       
       rows.sort(function(a,b){return a.id-b.id;});
@@ -694,8 +706,8 @@ function loadTodayStatus(){
             '<button class="admin-attitude-btn" data-name="'+r.name+'" data-delta="1">+</button>'+
           '</div></td>'+
           '<td><strong>'+r.customScore+'</strong></td>'+
-          '<td><strong>'+r.mission+'</strong>'+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
-          '<td>'+(r.mission>=2?'<button class="admin-snack-btn'+(r.snack?' given':'')+'" data-name="'+r.name+'" data-given="'+(r.snack?1:0)+'">'+(r.snack?'✔ 지급됨':'🍪 주기')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
+          '<td><strong>'+r.mission+'</strong>'+(!r.confirmed&&r.raw>0?' <small style="color:#E65100">⏳대기 '+r.raw+'</small>':'')+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
+          '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
       }).join('');
       resolve();
     }, reject);
@@ -721,8 +733,8 @@ function loadCumulativePoints(){
         map[d.name].praise+=(d.praise||0);
         map[d.name].att+=(d.attitude||0);
         map[d.name].cust+=(d.customScore||0);
-      map[d.name].mi+=(d.mission1?1:0)+(d.mission2?1:0);
-      map[d.name].sb+=(d.streakBonus||0);
+      map[d.name].mi+=missionPoints(d);
+      map[d.name].sb+=streakPoints(d);
       });
       renderPointsTable(map,el.pointsTableBody);
       resolve();
@@ -775,18 +787,18 @@ el.resetConfirm.addEventListener('click',function(){
   }).catch(function(e){console.error(e);showLoading(false);showToast('❌ 초기화 오류');});
 });
 
-// ===== Admin: Snack Check (미션 2개 완료 간식 지급) =====
+// ===== Admin: Mission Confirm (선생님 확인 -> 점수 반영, 2개 완료면 간식) =====
 el.todayTableBody.addEventListener('click',function(e){
   var btn=e.target.closest('.admin-snack-btn');
   if(!btn)return;
   var name=btn.dataset.name;
-  var give=btn.dataset.given!=='1';
+  var give=btn.dataset.confirmed!=='1',both=btn.dataset.both==='1';
   var today=getTodayString();
   var studentId=STUDENTS.find(function(s){return s.name===name;}).id;
   db.collection('checklist').doc(name+'_'+today).set({
-    name:name,studentId:studentId,date:today,snackGiven:give
+    name:name,studentId:studentId,date:today,missionConfirmed:give,snackGiven:give&&both
   },{merge:true})
-  .then(function(){showToast(give?'🍪 '+name+' 간식 지급 완료':'↩️ '+name+' 간식 지급을 취소했어요');})
+  .then(function(){showToast(give?'✅ '+name+' 미션 확인 완료'+(both?' (간식 🍪)':''):'↩️ '+name+' 미션 확인을 취소했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
 });
 
@@ -916,7 +928,7 @@ function loadHistoryData(startDate,endDate,label){
         var pr=d.praise||0;map[d.name].praise+=pr;tPraise+=pr;
         var at=d.attitude||0;map[d.name].att+=at;tAtt+=at;
         var cu=d.customScore||0;map[d.name].cust+=cu;tCust+=cu;
-        var mm=(d.mission1?1:0)+(d.mission2?1:0);map[d.name].mi+=mm;tMi+=mm;map[d.name].sb+=(d.streakBonus||0);
+        var mm=missionPoints(d);map[d.name].mi+=mm;tMi+=mm;map[d.name].sb+=streakPoints(d);
       }
     });
     // Show results
