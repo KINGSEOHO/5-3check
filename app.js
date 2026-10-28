@@ -71,7 +71,7 @@ var MISSION_POOL_BASIC_B = [
   {icon:"🏠",text:"친구에게 \"잘 가\" 인사하기"},
   {icon:"✅",text:"질문을 받으면 \"네\" 또는 \"아니요\"로 대답하기"},
   {icon:"😄",text:"친구에게 \"좋아\" 한 마디 해주기"},
-  {icon:"🌼",text:"친구에게 \"같이 하자\" 말해보기"}
+  {icon:"🌼",text:"친구에게 \"도와줄 수 있어?\" 말하고 같이 하기"}
 ];
 var BASIC_MISSION_STUDENT_IDS = [21];
 var MISSION_HINT_DEFAULT = "말이 어려우면 손짓, 웃음, 쪽지로 전해도 좋아요 😊";
