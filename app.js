@@ -49,7 +49,6 @@ var MISSION_POOL_B = [
   {icon:"💛",text:"친구가 실수했을 때 \"괜찮아\" 하고 다독여주기"},
   {icon:"📖",text:"짝에게 오늘 배운 것 알려주기"},
   {icon:"🏷️",text:"친구 이름을 불러주며 인사하기"},
-  {icon:"🪑",text:"친구와 나란히 앉거나 함께 걷기"},
   {icon:"🎁",text:"친구에게 작은 칭찬 한 가지 해주기"}
 ];
 // 쉬운 단계: 부담 없는 행동 1개 + 한 마디 말하기 1개 (말하기 미션이 매일 반드시 포함됨)
@@ -60,7 +59,6 @@ var MISSION_POOL_BASIC_A = [
   {icon:"🙂",text:"친구와 눈을 마주치고 고개 끄덕이기"},
   {icon:"💌",text:"친구에게 짧은 쪽지나 그림 전하기"},
   {icon:"👏",text:"친구가 발표할 때 박수쳐 주기"},
-  {icon:"🤝",text:"친구와 함께 놀이하거나 나란히 앉기"},
   {icon:"✏️",text:"친구가 떨어뜨린 물건 주워주기"}
 ];
 var MISSION_POOL_BASIC_B = [
@@ -87,7 +85,29 @@ function getTodayMissions(student){
   var sid=student?student.id:0;
   var ia=(day+sid*missionStride(a.length))%a.length;
   var ib=(day+sid*missionStride(b.length)+Math.floor(b.length/2))%b.length;
-  return {missions:[a[ia], b[ib]], hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+  return {missions:[a[ia], b[ib]], targets:getMissionTargets(student), hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
+}
+function mixHash(a,b,c){
+  var h=Math.imul(a,374761393)^Math.imul(b,668265263)^Math.imul(c,2147483647);
+  h=Math.imul(h^(h>>>13),1274126177);
+  return (h^(h>>>16))>>>0;
+}
+// 미션마다 함께할 친구를 날짜·학생 번호로 정해서 보여준다. (같은 날 같은 학생은 항상 같은 결과)
+// 기본은 반 친구를 돌아가며 만나게 하고, 관리자가 '자주 등장할 친구'를 지정하면 그 친구가 확률적으로 더 자주 나온다.
+function getMissionTargets(student){
+  if(!student)return ['',''];
+  var day=getDayNumber(),sid=student.id,c=missionConfig;
+  var others=STUDENTS.filter(function(s){return s.id!==sid;});
+  var feat=others.filter(function(s){return c.featuredIds.indexOf(s.id)!==-1;});
+  var picked=[];
+  for(var slot=0;slot<2;slot++){
+    var h=mixHash(day,sid,slot+1),t=null;
+    if(feat.length&&h%100<c.featuredPercent)t=feat[(h>>>8)%feat.length];
+    var k=(day*2+slot+sid*5)%others.length;
+    while(!t||(slot===1&&t===picked[0])){t=others[k%others.length];k++;}
+    picked.push(t);
+  }
+  return picked.map(function(s){return s.name;});
 }
 function gcd(x,y){return y?gcd(y,x%y):x;}
 // 목록 길이와 서로소인 간격 -> 학생 번호가 1씩 늘 때 목록 위치가 이만큼 건너뛰고, 모든 항목이 고르게 쓰임
@@ -129,7 +149,7 @@ function computeMissionStreak(){
 }
 
 // 관리자 '미션 관리' 탭에서 저장한 목록 (Firestore settings/missions). 없거나 읽기 실패하면 위 기본 목록 사용.
-var DEFAULT_MISSION_CONFIG = {poolA:MISSION_POOL_A,poolB:MISSION_POOL_B,basicA:MISSION_POOL_BASIC_A,basicB:MISSION_POOL_BASIC_B,basicIds:BASIC_MISSION_STUDENT_IDS,holidays:[]};
+var DEFAULT_MISSION_CONFIG = {poolA:MISSION_POOL_A,poolB:MISSION_POOL_B,basicA:MISSION_POOL_BASIC_A,basicB:MISSION_POOL_BASIC_B,basicIds:BASIC_MISSION_STUDENT_IDS,holidays:[],featuredIds:[],featuredPercent:50};
 var MISSION_LIST_KEYS = ['poolA','poolB','basicA','basicB'];
 function cloneMissionConfig(c){return JSON.parse(JSON.stringify(c));}
 function normalizeMissionConfig(raw){
@@ -144,6 +164,10 @@ function normalizeMissionConfig(raw){
   if(Array.isArray(raw.basicIds)){
     cfg.basicIds=raw.basicIds.filter(function(n){return Number.isInteger(n)&&n>=1&&n<=STUDENTS.length;});
   }
+  if(Array.isArray(raw.featuredIds)){
+    cfg.featuredIds=raw.featuredIds.filter(function(n){return Number.isInteger(n)&&n>=1&&n<=STUDENTS.length;});
+  }
+  if([30,50,70].indexOf(raw.featuredPercent)!==-1)cfg.featuredPercent=raw.featuredPercent;
   if(Array.isArray(raw.holidays)){
     cfg.holidays=raw.holidays.filter(function(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);});
   }
@@ -199,7 +223,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
- 'mission-with-a','mission-with-select-a','mission-with-b','mission-with-select-b',
+ 'mission-target-a','mission-target-b','mission-featured-ids','mission-featured-names','mission-featured-percent',
  'mission-streak','mission-holidays',
  'mission-confirm-btn','teacher-confirm-modal','tc-mission-list','tc-password','tc-error','tc-cancel','tc-confirm',
  'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
@@ -380,20 +404,8 @@ function listenHomeData(){
 }
 
 // ===== Student Page =====
-function buildMissionWithOptions(student){
-  ['A','B'].forEach(function(k){
-    var sel=el['missionWithSelect'+k];sel.innerHTML='';
-    var none=document.createElement('option');none.value='';none.textContent='(선택 안 함)';sel.appendChild(none);
-    STUDENTS.forEach(function(s){
-      if(s.id===student.id)return;
-      var o=document.createElement('option');o.value=s.name;o.textContent=s.name;sel.appendChild(o);
-    });
-  });
-}
-
 function openStudentPage(student){
   currentStudent=student;
-  buildMissionWithOptions(student);
   myMissionDays={};
   el.studentNameTitle.textContent=student.name;
   el.studentNumberBadge.textContent=student.id+'번';
@@ -478,11 +490,8 @@ function updateStudentUI(){
     el['missionStatus'+m[0]].className='card-status'+(m[2]?' done':'');
     el['missionCard'+m[0]].classList.toggle('checked',m[2]);
   });
-  [['A','mission1With',!!currentData.mission1],['B','mission2With',!!currentData.mission2]].forEach(function(m){
-    el['missionWith'+m[0]].style.display=m[2]?'block':'none';
-    el['missionWithSelect'+m[0]].value=currentData[m[1]]||'';
-    el['missionWithSelect'+m[0]].disabled=isMissionConfirmed(currentData);
-  });
+  el.missionTargetA.textContent='👉 친구: '+tm.targets[0];
+  el.missionTargetB.textContent='👉 친구: '+tm.targets[1];
   var mis=(currentData.mission1?1:0)+(currentData.mission2?1:0);
   var conf=isMissionConfirmed(currentData);
   var misPts=conf?mis:0;
@@ -519,10 +528,9 @@ function saveStudentData(){
     mission2:!!currentData.mission2,
     snackGiven:!!currentData.snackGiven,
     missionConfirmed:!!currentData.missionConfirmed,
-    mission1With:currentData.mission1With||'',
-    mission2With:currentData.mission2With||'',
     missionStreak:st.n,
     streakBonus:st.bonus,
+    missionTargets:getTodayMissions(currentStudent).targets,
     missionTexts:getTodayMissions(currentStudent).missions.map(function(m){return m.text;})
   }).catch(function(e){console.error(e);showToast('❌ 저장 오류');});
 }
@@ -536,10 +544,9 @@ el.dutyCheck.addEventListener('change',function(){
   currentData.duty=el.dutyCheck.checked;saveStudentData();
   if(currentData.duty){showToast('🧹 1인 1역 완료! 멋져요! ✨');miniConfetti();}
 });
-function bindMissionCheck(input,field,withField){
+function bindMissionCheck(input,field){
   input.addEventListener('change',function(){
     currentData[field]=input.checked;
-    if(!input.checked)currentData[withField]='';
     saveStudentData();
     if(input.checked){showToast('🤝 미션 완료! 따뜻한 마음이 전해졌어요 💛');miniConfetti();}
   });
@@ -547,9 +554,9 @@ function bindMissionCheck(input,field,withField){
 function openTeacherConfirm(){
   if(!currentStudent)return;
   el.tcMissionList.innerHTML='';
-  getTodayMissions(currentStudent).missions.forEach(function(m,i){
-    var w=currentData[i===0?'mission1With':'mission2With'];
-    var li=document.createElement('li');li.textContent=(currentData[i===0?'mission1':'mission2']?'✅ ':'⬜ ')+m.icon+' '+m.text+' — 함께한 친구: '+(w||'선택 안 함');el.tcMissionList.appendChild(li);
+  var tg=getTodayMissions(currentStudent);
+  tg.missions.forEach(function(m,i){
+    var li=document.createElement('li');li.textContent=(currentData[i===0?'mission1':'mission2']?'✅ ':'⬜ ')+m.icon+' '+m.text+' — 대상: '+tg.targets[i];el.tcMissionList.appendChild(li);
   });
   el.tcPassword.value='';el.tcError.classList.remove('show');
   el.teacherConfirmModal.classList.add('active');
@@ -578,14 +585,8 @@ el.tcConfirm.addEventListener('click',submitTeacherConfirm);
 el.tcPassword.addEventListener('keydown',function(e){if(e.key==='Enter')submitTeacherConfirm();});
 el.teacherConfirmModal.addEventListener('click',function(e){if(e.target===el.teacherConfirmModal)closeTeacherConfirm();});
 
-bindMissionCheck(el.missionCheckA,'mission1','mission1With');
-bindMissionCheck(el.missionCheckB,'mission2','mission2With');
-['A','B'].forEach(function(k,i){
-  var f=i===0?'mission1With':'mission2With';
-  el['missionWithSelect'+k].addEventListener('change',function(){
-    currentData[f]=el['missionWithSelect'+k].value;saveStudentData();
-  });
-});
+bindMissionCheck(el.missionCheckA,'mission1');
+bindMissionCheck(el.missionCheckB,'mission2');
 el.presentationPlus.addEventListener('click',function(){
   currentData.presentations=(currentData.presentations||0)+1;saveStudentData();
   showToast('🎤 발표 '+currentData.presentations+'회! 잘했어요!');
@@ -1143,6 +1144,12 @@ function updateMissionBasicNames(){
   }).join(', ')||'지정된 학생이 없어요';
 }
 
+function updateMissionFeaturedNames(){
+  el.missionFeaturedNames.textContent=missionDraft.featuredIds.map(function(id){
+    var s=STUDENTS.find(function(x){return x.id===id;});return id+'번 '+(s?s.name:'');
+  }).join(', ')||'지정된 친구가 없어요 (모두 고르게 나와요)';
+}
+
 function renderMissionEditor(){
   var box=el.missionEditors;box.innerHTML='';
   MISSION_LIST_DEFS.forEach(function(def){
@@ -1171,11 +1178,21 @@ function renderMissionEditor(){
   });
   el.missionBasicIds.value=missionDraft.basicIds.join(', ');
   updateMissionBasicNames();
+  el.missionFeaturedIds.value=missionDraft.featuredIds.join(', ');
+  el.missionFeaturedPercent.value=String(missionDraft.featuredPercent);
+  updateMissionFeaturedNames();
   el.missionHolidays.value=(missionDraft.holidays||[]).join(', ');
 }
 
 el.missionBasicIds.addEventListener('input',function(){
   missionDraft.basicIds=parseStudentIds(el.missionBasicIds.value);updateMissionBasicNames();
+});
+
+el.missionFeaturedIds.addEventListener('input',function(){
+  missionDraft.featuredIds=parseStudentIds(el.missionFeaturedIds.value);updateMissionFeaturedNames();
+});
+el.missionFeaturedPercent.addEventListener('change',function(){
+  missionDraft.featuredPercent=parseInt(el.missionFeaturedPercent.value,10)||50;
 });
 
 el.missionHolidays.addEventListener('input',function(){
@@ -1185,7 +1202,9 @@ el.missionHolidays.addEventListener('input',function(){
 
 el.missionResetDefault.addEventListener('click',function(){
   if(!confirm('기본 미션 목록으로 되돌릴까요?\n(저장을 눌러야 실제로 적용돼요)'))return;
-  var hol=missionDraft.holidays||[];missionDraft=cloneMissionConfig(DEFAULT_MISSION_CONFIG);missionDraft.holidays=hol;renderMissionEditor();
+  var keep=missionDraft;missionDraft=cloneMissionConfig(DEFAULT_MISSION_CONFIG);
+  missionDraft.holidays=keep.holidays||[];missionDraft.featuredIds=keep.featuredIds||[];missionDraft.featuredPercent=keep.featuredPercent||50;
+  renderMissionEditor();
   showToast('↩️ 기본 목록을 불러왔어요. 저장을 눌러야 적용돼요');
 });
 

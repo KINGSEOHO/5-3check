@@ -1721,45 +1721,6 @@ body::after {
   border-color: var(--sunflower-yellow);
 }
 
-/* ===== Mission "함께한 친구" 선택 (선택 사항) ===== */
-.mission-with {
-  margin-top: -4px;
-  padding: 0 6px;
-}
-
-.mission-with label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-medium);
-  margin-bottom: 4px;
-}
-
-.mission-optional {
-  color: var(--text-light);
-  font-size: 0.78rem;
-}
-
-.mission-with select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 2px solid #E0E0E0;
-  border-radius: var(--radius-sm);
-  background: var(--white);
-  font-family: 'Noto Sans KR', sans-serif;
-  font-size: 0.95rem;
-  color: var(--text-dark);
-  outline: none;
-}
-
-.mission-with select:focus {
-  border-color: var(--sunflower-yellow);
-}
-
-.mission-with select:disabled {
-  background: #F5F5F5;
-  color: var(--text-light);
-}
-
 /* ===== Mission Streak (연속 보너스 안내) ===== */
 .mission-streak {
   padding: 10px 14px;
@@ -1771,4 +1732,17 @@ body::after {
   line-height: 1.5;
   text-align: center;
   word-break: keep-all;
+}
+
+/* ===== Mission Target (미션마다 정해진 친구) ===== */
+.mission-target {
+  display: inline-block;
+  margin: 4px 0 2px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--sunflower-light);
+  color: var(--text-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
 }

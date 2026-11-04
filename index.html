@@ -110,6 +110,7 @@
                     <div class="card-icon" id="mission-icon-a">👋</div>
                     <div class="card-info">
                         <span class="card-label mission-text" id="mission-text-a"></span>
+                        <span class="mission-target" id="mission-target-a"></span>
                         <span class="card-status" id="mission-status-a">미완료</span>
                     </div>
                     <label class="toggle-switch">
@@ -117,24 +118,17 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div class="mission-with" id="mission-with-a" style="display:none;">
-                    <label for="mission-with-select-a">어떤 친구와 했나요? <span class="mission-optional">(선택 사항이에요)</span></label>
-                    <select id="mission-with-select-a"></select>
-                </div>
                 <div class="checklist-card mission-card" id="mission-card-b">
                     <div class="card-icon" id="mission-icon-b">🤝</div>
                     <div class="card-info">
                         <span class="card-label mission-text" id="mission-text-b"></span>
+                        <span class="mission-target" id="mission-target-b"></span>
                         <span class="card-status" id="mission-status-b">미완료</span>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="mission-check-b">
                         <span class="toggle-slider"></span>
                     </label>
-                </div>
-                <div class="mission-with" id="mission-with-b" style="display:none;">
-                    <label for="mission-with-select-b">어떤 친구와 했나요? <span class="mission-optional">(선택 사항이에요)</span></label>
-                    <select id="mission-with-select-b"></select>
                 </div>
                 <p class="mission-streak" id="mission-streak"></p>
                 <p class="mission-snack" id="mission-snack"></p>
@@ -422,6 +416,18 @@
                     <p class="mission-edit-desc">학생 번호를 쉼표로 구분해서 적어주세요. (예: 21)</p>
                     <input type="text" id="mission-basic-ids" class="mission-edit-ids" inputmode="numeric" autocomplete="off">
                     <p class="mission-edit-names" id="mission-basic-names"></p>
+                </div>
+                <div class="mission-edit-section">
+                    <h4>미션에 자주 나올 친구</h4>
+                    <p class="mission-edit-desc">미션마다 함께할 친구가 정해져서 나와요. 여기에 학생 번호를 적으면 그 친구가 다른 친구들의 미션에 더 자주 등장해요. (예: 21) 비워두면 반 친구들이 고르게 나와요.</p>
+                    <input type="text" id="mission-featured-ids" class="mission-edit-ids" inputmode="numeric" autocomplete="off" placeholder="예: 21">
+                    <p class="mission-edit-names" id="mission-featured-names"></p>
+                    <label class="mission-edit-desc" for="mission-featured-percent">등장 빈도</label>
+                    <select id="mission-featured-percent" class="mission-edit-ids">
+                        <option value="30">보통</option>
+                        <option value="50">자주</option>
+                        <option value="70">아주 자주</option>
+                    </select>
                 </div>
                 <div class="mission-edit-section">
                     <h4>쉬는 날 (연속 계산에서 제외)</h4>
