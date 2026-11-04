@@ -37,7 +37,7 @@ var MISSION_POOL_A = [
   {icon:"🤗",text:"친구에게 \"잘했어!\" 응원해 주기"}
 ];
 var MISSION_POOL_B = [
-  {icon:"✏️",text:"친구가 떨어뜨린 물건 주워주기"},
+  {icon:"💬",text:"친구와 오늘 재미있었던 일 하나 이야기 나누기"},
   {icon:"🤝",text:"도움이 필요한 친구에게 \"도와줄까?\" 물어보기"},
   {icon:"🧸",text:"쉬는 시간에 혼자 있는 친구에게 같이 놀자고 하기"},
   {icon:"📏",text:"친구에게 준비물 빌려주기"},
@@ -59,7 +59,7 @@ var MISSION_POOL_BASIC_A = [
   {icon:"🙂",text:"친구와 눈을 마주치고 고개 끄덕이기"},
   {icon:"💌",text:"친구에게 짧은 쪽지나 그림 전하기"},
   {icon:"👏",text:"친구가 발표할 때 박수쳐 주기"},
-  {icon:"✏️",text:"친구가 떨어뜨린 물건 주워주기"}
+  {icon:"💖",text:"친구에게 손으로 하트 만들어 보여주기"}
 ];
 var MISSION_POOL_BASIC_B = [
   {icon:"🗣️",text:"친구에게 \"안녕\" 한 마디 하기"},
