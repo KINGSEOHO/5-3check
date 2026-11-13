@@ -1767,6 +1767,6 @@ body::after {
   color: #C62828;
 }
 
-tr.absent-row td:not(:last-child) {
+tr.absent-row td:not(:nth-child(3)) {
   opacity: 0.5;
 }

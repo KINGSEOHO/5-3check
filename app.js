@@ -704,6 +704,7 @@ function loadTodayStatus(){
       el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;el.statMission.textContent=tMi;
       el.todayTableBody.innerHTML=rows.map(function(r){
         return '<tr'+(r.absent?' class="absent-row"':'')+'><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
+          '<td><button class="admin-absent-btn'+(r.absent?' on':'')+'" data-name="'+r.name+'" data-id="'+r.id+'">'+(r.absent?'결석 ✔':'결석')+'</button></td>'+
           '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
           '<td>'+(r.duty?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
           '<td><div class="admin-pres-ctrl">'+
@@ -723,8 +724,7 @@ function loadTodayStatus(){
           '</div></td>'+
           '<td><strong>'+r.customScore+'</strong></td>'+
           '<td><strong>'+r.mission+'</strong>'+(!r.confirmed&&r.raw>0?' <small style="color:#E65100">⏳대기 '+r.raw+'</small>':'')+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
-          '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td>'+
-          '<td><button class="admin-absent-btn'+(r.absent?' on':'')+'" data-name="'+r.name+'" data-id="'+r.id+'">'+(r.absent?'결석 ✔':'결석')+'</button></td></tr>';
+          '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
       }).join('');
       resolve();
     }, reject);
