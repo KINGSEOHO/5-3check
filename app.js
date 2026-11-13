@@ -1278,5 +1278,32 @@ var ss=document.createElement('style');
 ss.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}';
 document.head.appendChild(ss);
 
+// ===== 새 버전 자동 새로고침 =====
+// 배포로 app.js 가 바뀌면 열려 있는 학생 화면이 스스로 새로고침한다. (1분마다·화면으로 돌아올 때 확인)
+// 모달이 열려 있거나 입력 중이면 기다렸다가 새로고침하고, 관리자 화면은 작성 중인 내용이 날아가지 않게 안내만 한다.
+var runningVersion=null,updateNoticeShown=false;
+function appVersion(opts){
+  return fetch('app.js',opts).then(function(r){return r.ok?(r.headers.get('etag')||r.headers.get('last-modified')||''):'';});
+}
+function canReloadNow(){
+  if(pages.admin.classList.contains('active'))return false;
+  if(document.querySelector('.modal-overlay.active'))return false;
+  var a=document.activeElement;
+  return !(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='checkbox');
+}
+function checkForUpdate(){
+  if(!runningVersion)return;
+  appVersion({method:'HEAD',cache:'no-store'}).then(function(v){
+    if(!v||v===runningVersion)return;
+    if(canReloadNow()){location.reload();return;}
+    if(pages.admin.classList.contains('active')&&!updateNoticeShown){
+      updateNoticeShown=true;showToast('🔄 새 버전이 있어요. 작업을 마치고 Ctrl+Shift+R로 새로고침해 주세요');
+    }
+  }).catch(function(){});
+}
+appVersion({}).then(function(v){runningVersion=v;}).catch(function(){});
+setInterval(checkForUpdate,60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)checkForUpdate();});
+
 // ===== Init =====
 initDates();renderStudentGrid();listenHomeData();listenLastReset();listenMissionConfig();listenAbsences();
