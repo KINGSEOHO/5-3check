@@ -238,7 +238,7 @@ var el={};
  'filter-date','filter-week-date','filter-month','filter-start','filter-end','week-range-hint',
  'custom-student-grid','custom-logs-list',
  'custom-modal','custom-modal-title','modal-custom-reason','modal-custom-point','custom-modal-cancel','custom-modal-confirm',
- 'mission-target-a','mission-target-b','mission-featured-ids','mission-featured-names','mission-featured-percent',
+ 'absent-summary','mission-target-a','mission-target-b','mission-featured-ids','mission-featured-names','mission-featured-percent',
  'mission-streak','mission-holidays',
  'mission-confirm-btn','teacher-confirm-modal','tc-mission-list','tc-password','tc-error','tc-cancel','tc-confirm',
  'mission-editors','mission-basic-ids','mission-basic-names','mission-save','mission-reset-default',
@@ -682,6 +682,22 @@ function listenLastReset(){
 }
 
 // ===== Today Status =====
+// 표를 통째로 다시 그리면 학생들이 체크할 때마다 버튼이 눌리는 도중 사라져서 클릭이 무시된다.
+// 그래서 내용이 바뀐 줄만 교체한다.
+function patchTableRows(tbody,htmls){
+  var trs=tbody.children,i;
+  if(trs.length!==htmls.length){
+    tbody.innerHTML=htmls.join('');
+    for(i=0;i<trs.length;i++)trs[i]._h=htmls[i];
+    return;
+  }
+  for(i=0;i<htmls.length;i++){
+    if(trs[i]._h===htmls[i])continue;
+    var tmp=document.createElement('tbody');tmp.innerHTML=htmls[i];
+    var nt=tmp.firstElementChild;nt._h=htmls[i];
+    tbody.replaceChild(nt,trs[i]);
+  }
+}
 function loadTodayStatus(){
   return new Promise(function(resolve, reject){
     var today=getTodayString();
@@ -702,7 +718,7 @@ function loadTodayStatus(){
       rows.sort(function(a,b){return a.id-b.id;});
       el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
       el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;el.statMission.textContent=tMi;
-      el.todayTableBody.innerHTML=rows.map(function(r){
+      patchTableRows(el.todayTableBody,rows.map(function(r){
         return '<tr'+(r.absent?' class="absent-row"':'')+'><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
           '<td><button class="admin-absent-btn'+(r.absent?' on':'')+'" data-name="'+r.name+'" data-id="'+r.id+'">'+(r.absent?'결석 ✔':'결석')+'</button></td>'+
           '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
@@ -725,7 +741,9 @@ function loadTodayStatus(){
           '<td><strong>'+r.customScore+'</strong></td>'+
           '<td><strong>'+r.mission+'</strong>'+(!r.confirmed&&r.raw>0?' <small style="color:#E65100">⏳대기 '+r.raw+'</small>':'')+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
           '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
-      }).join('');
+      }));
+      var absNames=rows.filter(function(r){return r.absent;}).map(function(r){return r.name;});
+      el.absentSummary.textContent='🏠 오늘 결석: '+(absNames.length?absNames.join(', ')+' ('+absNames.length+'명)':'없음');
       resolve();
     }, reject);
   });
@@ -824,12 +842,12 @@ el.todayTableBody.addEventListener('click',function(e){
   var btn=e.target.closest('.admin-absent-btn');
   if(!btn)return;
   var id=parseInt(btn.dataset.id,10),name=btn.dataset.name,today=getTodayString();
-  var list=absentIds(today).slice(),i=list.indexOf(id);
-  if(i===-1)list.push(id);else list.splice(i,1);
-  var upd={};upd[today]=list.sort(function(a,b){return a-b;});
+  var adding=absentIds(today).indexOf(id)===-1,fv=firebase.firestore.FieldValue;
+  var upd={};upd[today]=adding?fv.arrayUnion(id):fv.arrayRemove(id);
+  var slow=setTimeout(function(){showToast('⚠️ 저장이 늦어지고 있어요. 인터넷 연결을 확인해 주세요');},5000);
   db.collection('settings').doc('absences').set(upd,{merge:true})
-  .then(function(){showToast(i===-1?'🏠 '+name+' 결석으로 표시했어요':'↩️ '+name+' 결석 표시를 취소했어요');})
-  .catch(function(err){console.error(err);showToast('❌ 저장 오류');});
+  .then(function(){clearTimeout(slow);showToast(adding?'🏠 '+name+' 결석으로 표시했어요':'↩️ '+name+' 결석 표시를 취소했어요');})
+  .catch(function(err){clearTimeout(slow);console.error(err);showToast('❌ 결석 저장 오류 ('+(err&&err.code?err.code:'알 수 없음')+')');});
 });
 
 // ===== Admin: Direct Presentation Edit =====

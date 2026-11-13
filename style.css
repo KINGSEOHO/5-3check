@@ -1770,3 +1770,10 @@ body::after {
 tr.absent-row td:not(:nth-child(3)) {
   opacity: 0.5;
 }
+
+.absent-summary {
+  margin: 10px 4px 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-medium);
+}
