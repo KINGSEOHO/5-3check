@@ -87,6 +87,8 @@ function getTodayMissions(student){
   var ib=(day+sid*missionStride(b.length)+Math.floor(b.length/2))%b.length;
   return {missions:[a[ia], b[ib]], targets:getMissionTargets(student), hint:basic?MISSION_HINT_BASIC:MISSION_HINT_DEFAULT};
 }
+var absencesByDate={}; // {날짜: [결석한 학생 번호]} - 관리자 '오늘 현황'에서 표시
+function absentIds(date){return absencesByDate[date]||[];}
 function mixHash(a,b,c){
   var h=Math.imul(a,374761393)^Math.imul(b,668265263)^Math.imul(c,2147483647);
   h=Math.imul(h^(h>>>13),1274126177);
@@ -99,12 +101,13 @@ function getMissionTargets(student){
   var day=getDayNumber(),sid=student.id,c=missionConfig;
   var others=STUDENTS.filter(function(s){return s.id!==sid;});
   var feat=others.filter(function(s){return c.featuredIds.indexOf(s.id)!==-1;});
+  var gone=absentIds(getTodayString());
   var picked=[];
   for(var slot=0;slot<2;slot++){
     var h=mixHash(day,sid,slot+1),t=null;
-    if(feat.length&&h%100<c.featuredPercent)t=feat[(h>>>8)%feat.length];
-    var k=(day*2+slot+sid*5)%others.length;
-    while(!t||(slot===1&&t===picked[0])){t=others[k%others.length];k++;}
+    if(feat.length&&h%100<c.featuredPercent){t=feat[(h>>>8)%feat.length];if(gone.indexOf(t.id)!==-1)t=null;}
+    var k=(day*2+slot+sid*5)%others.length,guard=0;
+    while((!t||(slot===1&&t===picked[0])||gone.indexOf(t.id)!==-1)&&guard++<80){t=others[k%others.length];k++;}
     picked.push(t);
   }
   return picked.map(function(s){return s.name;});
@@ -125,7 +128,7 @@ var STREAK_BONUS_POINTS = 1;
 var myMissionDays = {}; // {날짜: 그날 미션 2개를 모두 완료했는지}
 function isSchoolDay(s){
   var w=new Date(s+'T00:00:00').getDay();
-  return w!==0&&w!==6&&missionConfig.holidays.indexOf(s)===-1;
+  return w!==0&&w!==6&&missionConfig.holidays.indexOf(s)===-1&&!(currentStudent&&absentIds(s).indexOf(currentStudent.id)!==-1);
 }
 function prevSchoolDay(s){
   var d=new Date(s+'T00:00:00');
@@ -179,6 +182,18 @@ function listenMissionConfig(){
     missionConfig=normalizeMissionConfig(snap.exists?snap.data():null);
     if(currentStudent&&pages.student.classList.contains('active'))updateStudentUI();
   },function(err){console.error('미션 설정 읽기 오류:',err);});
+}
+
+function listenAbsences(){
+  db.collection('settings').doc('absences').onSnapshot(function(snap){
+    var raw=snap.exists?snap.data():{},map={};
+    Object.keys(raw).forEach(function(k){
+      if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&Array.isArray(raw[k]))map[k]=raw[k].filter(function(n){return Number.isInteger(n);});
+    });
+    absencesByDate=map;
+    if(currentStudent&&pages.student.classList.contains('active'))updateStudentUI();
+    if(adminUnsubscribes.today)loadTodayStatus().catch(function(){});
+  },function(err){console.error('결석 정보 읽기 오류:',err);});
 }
 
 // ===== Utilities =====
@@ -681,14 +696,14 @@ function loadTodayStatus(){
         var d=map[s.name] || {homework:false,duty:false,presentations:0,praise:0,attitude:0,customScore:0};
         if(d.homework)tHw++;if(d.duty)tDu++;tPr+=(d.presentations||0);tPraise+=(d.praise||0);tAtt+=(d.attitude||0);tCust+=(d.customScore||0);
         var raw=(d.mission1?1:0)+(d.mission2?1:0),cf=isMissionConfirmed(d),mi=cf?raw:0;tMi+=mi;
-        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,mission:mi,raw:raw,confirmed:cf,streak:d.missionStreak||0,sbonus:streakPoints(d)});
+        rows.push({id:s.id,name:s.name,homework:!!d.homework,duty:!!d.duty,presentations:d.presentations||0,praise:d.praise||0,attitude:d.attitude||0,customScore:d.customScore||0,absent:absentIds(today).indexOf(s.id)!==-1,mission:mi,raw:raw,confirmed:cf,streak:d.missionStreak||0,sbonus:streakPoints(d)});
       });
       
       rows.sort(function(a,b){return a.id-b.id;});
       el.statHomework.textContent=tHw;el.statDuty.textContent=tDu;el.statPresentation.textContent=tPr;el.statPraise.textContent=tPraise;
       el.statAttitude.textContent=tAtt;el.statCustom.textContent=tCust;el.statMission.textContent=tMi;
       el.todayTableBody.innerHTML=rows.map(function(r){
-        return '<tr><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
+        return '<tr'+(r.absent?' class="absent-row"':'')+'><td>'+r.id+'</td><td><strong>'+r.name+'</strong></td>'+
           '<td>'+(r.homework?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
           '<td>'+(r.duty?'<span class="check-mark">✔</span>':'<span class="cross-mark">—</span>')+'</td>'+
           '<td><div class="admin-pres-ctrl">'+
@@ -708,7 +723,8 @@ function loadTodayStatus(){
           '</div></td>'+
           '<td><strong>'+r.customScore+'</strong></td>'+
           '<td><strong>'+r.mission+'</strong>'+(!r.confirmed&&r.raw>0?' <small style="color:#E65100">⏳대기 '+r.raw+'</small>':'')+(r.sbonus?' <small>🎁+'+r.sbonus+'</small>':'')+(r.streak>=2?' <small>🔥'+r.streak+'일</small>':'')+'</td>'+
-          '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td></tr>';
+          '<td>'+(r.raw>=1?'<button class="admin-snack-btn'+(r.confirmed?' given':'')+'" data-name="'+r.name+'" data-confirmed="'+(r.confirmed?1:0)+'" data-both="'+(r.raw>=2?1:0)+'">'+(r.confirmed?'✔ 확인됨'+(r.raw>=2?' 🍪':''):'✅ 확인')+'</button>':'<span class="cross-mark">—</span>')+'</td>'+
+          '<td><button class="admin-absent-btn'+(r.absent?' on':'')+'" data-name="'+r.name+'" data-id="'+r.id+'">'+(r.absent?'결석 ✔':'결석')+'</button></td></tr>';
       }).join('');
       resolve();
     }, reject);
@@ -801,6 +817,19 @@ el.todayTableBody.addEventListener('click',function(e){
   },{merge:true})
   .then(function(){showToast(give?'✅ '+name+' 미션 확인 완료'+(both?' (간식 🍪)':''):'↩️ '+name+' 미션 확인을 취소했어요');})
   .catch(function(e){console.error(e);showToast('❌ 수정 오류');});
+});
+
+// ===== Admin: Absence (결석 표시 -> 그 친구는 미션 대상에서 빠지고 다른 친구로 바뀜) =====
+el.todayTableBody.addEventListener('click',function(e){
+  var btn=e.target.closest('.admin-absent-btn');
+  if(!btn)return;
+  var id=parseInt(btn.dataset.id,10),name=btn.dataset.name,today=getTodayString();
+  var list=absentIds(today).slice(),i=list.indexOf(id);
+  if(i===-1)list.push(id);else list.splice(i,1);
+  var upd={};upd[today]=list.sort(function(a,b){return a-b;});
+  db.collection('settings').doc('absences').set(upd,{merge:true})
+  .then(function(){showToast(i===-1?'🏠 '+name+' 결석으로 표시했어요':'↩️ '+name+' 결석 표시를 취소했어요');})
+  .catch(function(err){console.error(err);showToast('❌ 저장 오류');});
 });
 
 // ===== Admin: Direct Presentation Edit =====
@@ -1232,4 +1261,4 @@ ss.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:t
 document.head.appendChild(ss);
 
 // ===== Init =====
-initDates();renderStudentGrid();listenHomeData();listenLastReset();listenMissionConfig();
+initDates();renderStudentGrid();listenHomeData();listenLastReset();listenMissionConfig();listenAbsences();

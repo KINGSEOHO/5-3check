@@ -1746,3 +1746,27 @@ body::after {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* ===== Absence (결석 표시) ===== */
+.admin-absent-btn {
+  border: 1px solid #E0E0E0;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--white);
+  color: var(--text-medium);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-absent-btn.on {
+  background: #FFEBEE;
+  border-color: #EF9A9A;
+  color: #C62828;
+}
+
+tr.absent-row td:not(:last-child) {
+  opacity: 0.5;
+}
